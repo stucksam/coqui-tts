@@ -6,30 +6,31 @@ from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
 from TTS.utils.manage import ModelManager
-
+from TTS.utils.alt_loggers import WandbLogger
 # Logging parameters
 RUN_NAME = "GPT_XTTS_v2.0_LJSpeech_FT"
 PROJECT_NAME = "XTTS_trainer"
-DASHBOARD_LOGGER = "tensorboard"
+DASHBOARD_LOGGER = "wandb"
 LOGGER_URI = None
 
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
-OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
+#OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
+OUT_PATH = "/cluster/data/deri/TTS/TTS_dante/trained"
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
-BATCH_SIZE = 3  # set here the batch size
-GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
+BATCH_SIZE = 12  # set here the batch size
+GRAD_ACUMM_STEPS = 21  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 # Define here the dataset that you want to use for the fine-tuning on.
 config_dataset = BaseDatasetConfig(
     formatter="ljspeech",
-    dataset_name="ljspeech",
-    path="/raid/datasets/LJSpeech-1.1_24khz/",
-    meta_file_train="/raid/datasets/LJSpeech-1.1_24khz/metadata.csv",
-    language="en",
+    dataset_name="dante",
+    path="/cluster/data/deri/dante_dataset",
+    meta_file_train="metadata.txt",
+    language="it",
 )
 
 # Add here the configs of the datasets
@@ -61,6 +62,7 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
 XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+#XTTS_CHECKPOINT = "/work_space_data/TTS_dante/trained\GPT_XTTS_v2.0_LJSpeech_FT-September-18-2024_04+03PM-dbf1a08a/best_model_3825.pth"  # model.pth file
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -72,7 +74,7 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    "./tests/data/ljspeech/wavs/LJ001-0002.wav"  # speaker reference to be used in training test sentences
+    "/cluster/data/deri/dante_dataset/wavs/canto_2_terzina_30.wav"  # speaker reference to be used in training test sentences
 ]
 LANGUAGE = config_dataset.language
 
@@ -109,19 +111,23 @@ def main():
         dashboard_logger=DASHBOARD_LOGGER,
         logger_uri=LOGGER_URI,
         audio=audio_config,
+        model_param_stats=False,
         batch_size=BATCH_SIZE,
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
         num_loader_workers=8,
         eval_split_max_size=256,
+        eval_split_size=0.02,
         print_step=50,
         plot_step=100,
         log_model_step=1000,
-        save_step=10000,
+        save_step=1000,
         save_n_checkpoints=1,
         save_checkpoints=True,
+        wandb_entity='deri',
         # target_loss="loss",
         print_eval=False,
+        shuffle=True,
         # Optimizer values like tortoise, pytorch implementation with modifications to not apply WD to non-weight parameters.
         optimizer="AdamW",
         optimizer_wd_only_on_weights=OPTIMIZER_WD_ONLY_ON_WEIGHTS,
@@ -132,12 +138,27 @@ def main():
         lr_scheduler_params={"milestones": [50000 * 18, 150000 * 18, 300000 * 18], "gamma": 0.5, "last_epoch": -1},
         test_sentences=[
             {
-                "text": "It took me quite a long time to develop a voice, and now that I have it I'm not going to be silent.",
+                "text": "Ma ficca li occhi a valle, ché s’approccia  la riviera del sangue in la qual bolle  qual che per violenza in altrui noccia.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": LANGUAGE,
             },
             {
-                "text": "This cake is great. It's so delicious and moist.",
+                "text": "«Vexilla regis prodeunt inferni  verso di noi; però dinanzi mira»,  disse ’l maestro mio «se tu ’l discerni».",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": LANGUAGE,
+            },
+            {
+                "text": "Com’a lui piacque, il collo li avvinghiai;  ed el prese di tempo e loco poste,  e quando l’ali fuoro aperte assai, ",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": LANGUAGE,
+            },
+            {
+                "text": "e s’io divenni allora travagliato,  la gente grossa il pensi, che non vede  qual è quel punto ch’io avea passato.",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": LANGUAGE,
+            },
+            {
+                "text": "E quindi uscimmo a riveder le stelle.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": LANGUAGE,
             },
@@ -169,6 +190,12 @@ def main():
         train_samples=train_samples,
         eval_samples=eval_samples,
     )
+    trainer.dashboard_logger = WandbLogger(  # pylint: disable=abstract-class-instantiated
+            project=config.project_name,
+            name=config.run_name,
+            config=config,
+            entity=config.wandb_entity,
+        )
     trainer.fit()
 
 
