@@ -115,7 +115,7 @@ def main():
         batch_size=BATCH_SIZE,
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
-        num_loader_workers=8,
+        num_loader_workers=0,
         eval_split_max_size=256,
         eval_split_size=0.02,
         print_step=50,
@@ -127,6 +127,7 @@ def main():
         wandb_entity='deri',
         # target_loss="loss",
         print_eval=False,
+        datasets=DATASETS_CONFIG_LIST,
         shuffle=True,
         # Optimizer values like tortoise, pytorch implementation with modifications to not apply WD to non-weight parameters.
         optimizer="AdamW",
@@ -136,6 +137,7 @@ def main():
         lr_scheduler="MultiStepLR",
         # it was adjusted accordly for the new step scheme
         lr_scheduler_params={"milestones": [50000 * 18, 150000 * 18, 300000 * 18], "gamma": 0.5, "last_epoch": -1},
+        use_h5=True,
         test_sentences=[
             {
                 "text": "Ma ficca li occhi a valle, ché s’approccia  la riviera del sangue in la qual bolle  qual che per violenza in altrui noccia.",

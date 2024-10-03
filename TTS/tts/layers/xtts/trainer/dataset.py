@@ -1,7 +1,10 @@
-import os
+import os.path
+
+import h5py
 import random
 import sys
 
+import librosa
 import torch
 import torch.nn.functional as F
 import torch.utils.data
@@ -62,6 +65,10 @@ class XTTSDataset(torch.utils.data.Dataset):
         self.max_wav_len = model_args.max_wav_length
         self.max_text_len = model_args.max_text_length
         self.use_masking_gt_prompt_approach = model_args.gpt_use_masking_gt_prompt_approach
+        if config.use_h5:
+            self.h5_files = {}
+            for dataset_config in config.datasets:
+                self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
         assert self.max_wav_len is not None and self.max_text_len is not None
 
         self.samples = samples
@@ -107,7 +114,14 @@ class XTTSDataset(torch.utils.data.Dataset):
         text = str(sample["text"])
         tseq = self.get_text(text, sample["language"])
         audiopath = sample["audio_file"]
-        wav = load_audio(audiopath, self.sample_rate)
+        if self.config.use_h5:
+            h5_file = self.h5_files[sample['audio_unique_name'].split('#')[0]]
+            sample_name = os.path.split(sample['audio_unique_name'])[-1]
+            wav = h5_file[sample_name]
+            wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
+            wav = torch.tensor(wav[None, :], dtype=torch.float)
+        else:
+            wav = load_audio(audiopath, self.sample_rate)
         if text is None or len(text.strip()) == 0:
             raise ValueError
         if wav is None or wav.shape[-1] < (0.5 * self.sample_rate):

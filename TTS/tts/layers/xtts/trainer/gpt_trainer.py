@@ -29,7 +29,7 @@ class GPTTrainerConfig(XttsConfig):
     weighted_loss_attrs: dict = field(default_factory=lambda: {})
     weighted_loss_multipliers: dict = field(default_factory=lambda: {})
     test_sentences: List[dict] = field(default_factory=lambda: [])
-
+    use_h5:bool = False
 
 @dataclass
 class XttsAudioConfig(XttsAudioConfig):
