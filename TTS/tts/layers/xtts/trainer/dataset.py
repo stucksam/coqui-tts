@@ -10,6 +10,10 @@ import torch.nn.functional as F
 import torch.utils.data
 
 from TTS.tts.models.xtts import load_audio
+import threading
+
+# Thread-local storage for each worker to keep its HDF5 file handles
+worker_file_handles = threading.local()
 
 torch.set_num_threads(1)
 
@@ -119,12 +123,17 @@ class XTTSDataset(torch.utils.data.Dataset):
         audiopath = sample["audio_file"]
         if self.config.use_h5:
             dataset_name = sample['audio_unique_name'].split('#')[0]
-            h5_path = self.h5_paths[dataset_name]
-            with h5py.File(h5_path, 'r') as h5_file:
-                sample_name = os.path.split(sample['audio_unique_name'])[-1]
-                wav = h5_file[sample_name][...]
-                #wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
-                wav = torch.tensor(wav[None, :], dtype=torch.float)
+            if not hasattr(worker_file_handles, 'h5_files'):
+                worker_file_handles.h5_files = {}
+            if dataset_name not in worker_file_handles.h5_files:
+                h5_path = self.h5_paths[dataset_name]
+                worker_file_handles.h5_files[dataset_name] = h5py.File(h5_path, 'r')
+
+            h5_file = worker_file_handles.h5_files[dataset_name]
+            sample_name = os.path.split(sample['audio_unique_name'])[-1]
+            wav = h5_file[sample_name][...]
+            #wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
+            wav = torch.tensor(wav[None, :], dtype=torch.float)
         else:
             wav = load_audio(audiopath, self.sample_rate)
         if text is None or len(text.strip()) == 0:
