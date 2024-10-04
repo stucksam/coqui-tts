@@ -118,8 +118,8 @@ class XTTSDataset(torch.utils.data.Dataset):
             h5_file = self.h5_files[sample['audio_unique_name'].split('#')[0]]
             sample_name = os.path.split(sample['audio_unique_name'])[-1]
             wav = h5_file[sample_name]
-            wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
-            wav = torch.tensor(wav[None, :], dtype=torch.float)
+            #wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
+            wav = torch.tensor(wav[...][None, :], dtype=torch.float)
         else:
             wav = load_audio(audiopath, self.sample_rate)
         if text is None or len(text.strip()) == 0:
