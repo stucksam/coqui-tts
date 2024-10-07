@@ -104,9 +104,10 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/550cc4a1-5cb1-4240-8689-f6f14c617a31.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/0d54807c-ec46-415f-8ef2-0a2f769aab1a.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_0.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_1.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_2.wav",
+
     # speaker reference to be used in training test sentences
 ]
 
