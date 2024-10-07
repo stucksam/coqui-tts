@@ -31,7 +31,10 @@ def key_samples_by_col(samples, col):
 
 
 def get_prompt_slice(gt_path, max_sample_length, min_sample_length, sample_rate, is_eval=False):
-    rel_clip = load_audio(gt_path, sample_rate)
+    if type(gt_path) == str:
+        rel_clip = load_audio(gt_path, sample_rate)
+    else:
+        rel_clip = torch.clone(gt_path)
     # if eval uses a middle size sample when it is possible to be more reproducible
     if is_eval:
         sample_length = int((min_sample_length + max_sample_length) / 2)
@@ -145,7 +148,7 @@ class XTTSDataset(torch.utils.data.Dataset):
         if self.use_masking_gt_prompt_approach:
             # get a slice from GT to condition the model
             cond, _, cond_idxs = get_prompt_slice(
-                audiopath, self.max_conditioning_length, self.min_conditioning_length, self.sample_rate, self.is_eval
+                wav, self.max_conditioning_length, self.min_conditioning_length, self.sample_rate, self.is_eval
             )
             # if use masking do not use cond_len
             cond_len = torch.nan

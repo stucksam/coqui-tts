@@ -594,6 +594,7 @@ class VoiceBpeTokenizer:
         self.tokenizer = None
         if vocab_file is not None:
             self.tokenizer = Tokenizer.from_file(vocab_file)
+
         self.char_limits = {
             "en": 250,
             "de": 253,
@@ -645,8 +646,12 @@ class VoiceBpeTokenizer:
 
     def encode(self, txt, lang):
         lang = lang.split("-")[0]  # remove the region
-        self.check_input_length(txt, lang)
-        txt = self.preprocess_text(txt, lang)
+        if lang.startswith("ch_"):
+            self.check_input_length(txt, 'de')
+            txt = self.preprocess_text(txt, 'de')
+        else:
+            self.check_input_length(txt, lang)
+            txt = self.preprocess_text(txt, lang)
         lang = "zh-cn" if lang == "zh" else lang
         txt = f"[{lang}]{txt}"
         txt = txt.replace(" ", "[SPACE]")
