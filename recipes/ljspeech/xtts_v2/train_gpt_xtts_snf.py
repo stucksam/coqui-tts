@@ -32,8 +32,8 @@ OUT_PATH = "/cluster/data/deri/TTS/TTS_CH/trained"
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
-BATCH_SIZE = 3  # set here the batch size
-GRAD_ACUMM_STEPS = 21  # set here the grad accumulation steps
+BATCH_SIZE = 12  # set here the batch size
+GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 BASE_DATASET_PATH = "/cluster/data/deri/snf_tts/speakers"
@@ -160,6 +160,7 @@ def main():
         wandb_entity='deri',
         # target_loss="loss",
         print_eval=False,
+        run_eval_steps=2500,
         datasets=DATASETS_CONFIG_LIST,
         shuffle=True,
         # Optimizer values like tortoise, pytorch implementation with modifications to not apply WD to non-weight parameters.
