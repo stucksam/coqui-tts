@@ -104,7 +104,9 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    "/cluster/data/deri/dante_dataset/wavs/canto_2_terzina_30.wav"
+    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/550cc4a1-5cb1-4240-8689-f6f14c617a31.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/0d54807c-ec46-415f-8ef2-0a2f769aab1a.wav",
     # speaker reference to be used in training test sentences
 ]
 
@@ -170,29 +172,39 @@ def main():
         use_h5=True,
         test_sentences=[
             {
-                "text": "Ma ficca li occhi a valle, ché s’approccia  la riviera del sangue in la qual bolle  qual che per violenza in altrui noccia.",
+                "text": "Diese Privatperson hat sie anscheinend sogar vermietet.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_be',
             },
             {
-                "text": "«Vexilla regis prodeunt inferni  verso di noi; però dinanzi mira»,  disse ’l maestro mio «se tu ’l discerni».",
+                "text": "Diese Privatperson hat sie anscheinend sogar vermietet.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_zh',
             },
             {
-                "text": "Com’a lui piacque, il collo li avvinghiai;  ed el prese di tempo e loco poste,  e quando l’ali fuoro aperte assai, ",
+                "text": "Das ist ein Hinweis für die zukünftige Planung.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_vs',
             },
             {
-                "text": "e s’io divenni allora travagliato,  la gente grossa il pensi, che non vede  qual è quel punto ch’io avea passato.",
+                "text": "Das ist ein Hinweis für die zukünftige Planung.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_bs',
             },
             {
-                "text": "E quindi uscimmo a riveder le stelle.",
+                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_os',
+            },
+            {
+                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": 'ch_in',
+            },
+            {
+                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": 'ch_gr',
             },
         ],
     )
