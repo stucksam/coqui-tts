@@ -1,4 +1,4 @@
-import os, json
+import os, json, random
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
 
@@ -7,6 +7,8 @@ from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
 from TTS.utils.manage import ModelManager
 from TTS.utils.alt_loggers import WandbLogger
+
+random.seed(240753)
 
 LANG_MAP = {
     'ch_be': 'Bern',
@@ -92,8 +94,11 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+TOKENIZER_FILE = "/cluster/data/deri/TTS/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/vocab.json"  # vocab.json file
 XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-# XTTS_CHECKPOINT = "/work_space_data/TTS_dante/trained\GPT_XTTS_v2.0_LJSpeech_FT-September-18-2024_04+03PM-dbf1a08a/best_model_3825.pth"  # model.pth file
+XTTS_CHECKPOINT = "/cluster/data/deri/TTS/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/best_model_55500.pth"  # model.pth file
+
+XTTS_RELOAD = True
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -213,35 +218,36 @@ def main():
 
     config.languages += list(LANG_MAP.keys())
 
-    # init the model from config
-    model = GPTTrainer.init_from_config(config)
+    if not XTTS_RELOAD:
+        model = GPTTrainer.init_from_config(config)
 
-    #hack around here to add new tokens
+        new_toks = ['[ch_be]', '[ch_bs]', '[ch_gr]', '[ch_in]', '[ch_os]', '[ch_vs]', '[ch_zh]']
+        model.xtts.tokenizer.tokenizer.add_special_tokens(
+            new_toks
+        )
+        new_ids = [model.xtts.tokenizer.tokenizer.encode(t).ids[0] for t in new_toks]
 
-    new_toks = ['[ch_be]', '[ch_bs]', '[ch_gr]', '[ch_in]', '[ch_os]', '[ch_vs]', '[ch_zh]']
-    model.xtts.tokenizer.tokenizer.add_special_tokens(
-        new_toks
-    )
-    new_ids = [model.xtts.tokenizer.tokenizer.encode(t).ids[0] for t in new_toks]
+        old_te = model.xtts.gpt.text_embedding
+        old_th = model.xtts.gpt.text_head
+        old_number_text_token = model.xtts.gpt.number_text_tokens
 
-    old_te = model.xtts.gpt.text_embedding
-    old_th = model.xtts.gpt.text_head
-    old_number_text_token = model.xtts.gpt.number_text_tokens
+        model_dim = old_te.weight.shape[-1]
+        number_text_tokens = model.xtts.tokenizer.get_number_tokens()
+        model.xtts.args.gpt_number_text_tokens = number_text_tokens
 
-    model_dim = old_te.weight.shape[-1]
-    number_text_tokens = model.xtts.tokenizer.get_number_tokens()
-    model.xtts.args.gpt_number_text_tokens = number_text_tokens
+        new_text_embedding = Embedding(number_text_tokens, model_dim)
+        new_text_head = Linear(model_dim, number_text_tokens)
 
-    new_text_embedding = Embedding(number_text_tokens, model_dim)
-    new_text_head = Linear(model_dim, number_text_tokens)
+        model.xtts.gpt.text_embedding = new_text_embedding
+        model.xtts.gpt.text_head = new_text_head
 
-    model.xtts.gpt.text_embedding = new_text_embedding
-    model.xtts.gpt.text_head = new_text_head
+        for i in range(old_number_text_token):
+            new_text_embedding.weight.data[i] = old_te.weight.data[i]
+            new_text_head.weight.data[i] = old_th.weight.data[i]
+            new_text_head.bias.data[i] = old_th.bias.data[i]
 
-    for i in range(old_number_text_token):
-        new_text_embedding.weight.data[i] = old_te.weight.data[i]
-        new_text_head.weight.data[i] = old_th.weight.data[i]
-        new_text_head.bias.data[i] = old_th.bias.data[i]
+    else:
+        model = GPTTrainer.init_from_config(config)
 
     # load training samples
     train_samples, eval_samples = load_tts_samples(
@@ -254,7 +260,7 @@ def main():
     # init the trainer and 🚀
     trainer = Trainer(
         TrainerArgs(
-            restore_path=None,
+            restore_path=None if not XTTS_RELOAD else XTTS_CHECKPOINT,
             # xtts checkpoint is restored via xtts_checkpoint key so no need of restore it using Trainer restore_path parameter
             skip_train_epoch=False,
             start_with_eval=START_WITH_EVAL,
@@ -271,6 +277,9 @@ def main():
         name=config.run_name,
         config=config,
         entity=config.wandb_entity,
+    )
+    model.xtts.tokenizer.tokenizer.save(
+        path=os.path.join(trainer.output_path, 'vocab.json')
     )
     trainer.fit()
 
