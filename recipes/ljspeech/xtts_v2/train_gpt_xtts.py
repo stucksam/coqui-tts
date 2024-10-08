@@ -20,17 +20,17 @@ OUT_PATH = "/cluster/data/deri/TTS/TTS_dante/trained"
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
-BATCH_SIZE = 12  # set here the batch size
+BATCH_SIZE = 3  # set here the batch size
 GRAD_ACUMM_STEPS = 21  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 # Define here the dataset that you want to use for the fine-tuning on.
 config_dataset = BaseDatasetConfig(
-    formatter="ljspeech",
+    formatter="ljspeech", #create custom formatter with speaker name
     dataset_name="dante",
     path="/cluster/data/deri/dante_dataset",
     meta_file_train="metadata.txt",
-    language="it",
+    language="it", #create dial_id
 )
 
 # Add here the configs of the datasets
@@ -74,7 +74,7 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    "/cluster/data/deri/dante_dataset/wavs/canto_2_terzina_30.wav"  # speaker reference to be used in training test sentences
+    "/cluster/data/deri/dante_dataset/text_wavs/canto_2_terzina_30.wav"  # speaker reference to be used in training test sentences
 ]
 LANGUAGE = config_dataset.language
 
@@ -115,7 +115,7 @@ def main():
         batch_size=BATCH_SIZE,
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
-        num_loader_workers=0,
+        num_loader_workers=2,
         eval_split_max_size=256,
         eval_split_size=0.02,
         print_step=50,
