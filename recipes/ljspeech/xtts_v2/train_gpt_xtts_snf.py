@@ -59,6 +59,24 @@ for speaker in os.listdir(BASE_DATASET_PATH):
             )
         )
 
+BASE_DATASET_PATH_SD = "/cluster/data/deri/swissdial"
+
+for dial in os.listdir(BASE_DATASET_PATH_SD):
+    with open(os.path.join(BASE_DATASET_PATH_SD, dial, 'metadata.txt'), "rt", encoding='utf-8') as metadata_file:
+        nsamples = metadata_file.readlines()
+        if len(nsamples) < 100:
+            continue
+        language = f'ch_{dial}' if not dial == 'ag' else 'zh'
+        DATASETS_CONFIG_LIST.append(
+            BaseDatasetConfig(
+                formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
+                dataset_name=f"stt4sg_{dial}",
+                path=os.path.join(BASE_DATASET_PATH_SD, dial),
+                meta_file_train="metadata.txt",
+                language=f'ch_{dial}',  # create dial_id
+            )
+        )
+
 # Define here the dataset that you want to use for the fine-tuning on.
 # config_dataset = BaseDatasetConfig(
 #     formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
