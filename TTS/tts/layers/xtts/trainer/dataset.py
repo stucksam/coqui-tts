@@ -31,7 +31,7 @@ def key_samples_by_col(samples, col):
 
 
 def get_prompt_slice(gt_path, max_sample_length, min_sample_length, sample_rate, is_eval=False):
-    if type(gt_path) == str:
+    if isinstance(gt_path, str):
         rel_clip = load_audio(gt_path, sample_rate)
     else:
         rel_clip = torch.clone(gt_path)
@@ -75,8 +75,8 @@ class XTTSDataset(torch.utils.data.Dataset):
         if config.use_h5:
             #self.h5_files = {}
             self.h5_paths = {}
-            for dataset_config in config.datasets:
-                #self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
+            for dataset_config in config.datasets: # TODO: change to my setup
+                # self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
                 self.h5_paths[dataset_config.dataset_name] = os.path.join(dataset_config.path, 'audio.h5')
 
         assert self.max_wav_len is not None and self.max_text_len is not None

@@ -18,6 +18,7 @@ LANG_MAP = {
     'ch_os': 'Ostschweiz',
     'ch_vs': 'Wallis',
     'ch_zh': 'Zürich',
+    "de": "Deutschland"
 }
 LANG_MAP_INV = {v:k for k,v in LANG_MAP.items()}
 
@@ -29,7 +30,7 @@ LOGGER_URI = None
 
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
 # OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
-OUT_PATH = "/cluster/data/deri/TTS/TTS_CH/trained"
+OUT_PATH = "/cluster/data/stucksam/TTS/TTS_CH/trained"
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
@@ -38,7 +39,7 @@ BATCH_SIZE = 12  # set here the batch size
 GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
-BASE_DATASET_PATH = "/cluster/data/deri/snf_tts/speakers"
+BASE_DATASET_PATH = "/cluster/home/stucksam/datasets/dialects"
 with open(os.path.join('/cluster/data/deri/snf_tts/', "speaker_to_dialect.json"), 'rt', encoding='utf-8') as fp:
     speaker_to_dialect = json.load(fp)
 
@@ -112,9 +113,9 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-TOKENIZER_FILE = "/cluster/data/deri/TTS/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/vocab.json"  # vocab.json file
+TOKENIZER_FILE = "/cluster/home/stucksam/coqui-tts/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/vocab.json"  # vocab.json file
 XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-XTTS_CHECKPOINT = "/cluster/data/deri/TTS/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/best_model_55500.pth"  # model.pth file
+XTTS_CHECKPOINT = "/cluster/home/stucksam/coqui-tts/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/best_model_55500.pth"  # model.pth file
 
 XTTS_RELOAD = True
 
@@ -128,7 +129,7 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 # Training sentences generations
 SPEAKER_REFERENCE = [
     "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_0.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_1.wav",
+    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_1.wav",  # TODO add samples of ZH Woman
     "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_2.wav",
 
     # speaker reference to be used in training test sentences
