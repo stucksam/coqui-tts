@@ -45,38 +45,41 @@ with open(os.path.join('/cluster/data/deri/snf_tts/', "speaker_to_dialect.json")
 
 DATASETS_CONFIG_LIST = []
 
-for speaker in os.listdir(BASE_DATASET_PATH):
-    with open(os.path.join(BASE_DATASET_PATH, speaker, 'metadata.txt'), "rt", encoding='utf-8') as metadata_file:
+txt_files = [f for f in os.listdir(BASE_DATASET_PATH) if f.endswith('.txt')]
+
+for metadata in txt_files:
+    dialect_name = metadata.replace(".txt", "")
+    with open(os.path.join(BASE_DATASET_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
-        if len(nsamples) < 100:
+        if len(nsamples) < 100:  #skip small dialects
             continue
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
-                dataset_name=f"stt4sg_{speaker}",
-                path=os.path.join(BASE_DATASET_PATH, speaker),
-                meta_file_train="metadata.txt",
-                language=LANG_MAP_INV[speaker_to_dialect[speaker]],  # create dial_id
+                dataset_name=f"stt4sg_{dialect_name}",
+                path=os.path.join(BASE_DATASET_PATH, metadata),
+                meta_file_train=metadata,
+                language=LANG_MAP_INV[dialect_name],  # create dial_id
             )
         )
 
-BASE_DATASET_PATH_SD = "/cluster/data/deri/swissdial"
-
-for dial in os.listdir(BASE_DATASET_PATH_SD):
-    with open(os.path.join(BASE_DATASET_PATH_SD, dial, 'metadata.txt'), "rt", encoding='utf-8') as metadata_file:
-        nsamples = metadata_file.readlines()
-        if len(nsamples) < 100:
-            continue
-        language = f'ch_{dial}' if not dial == 'ag' else 'zh'
-        DATASETS_CONFIG_LIST.append(
-            BaseDatasetConfig(
-                formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
-                dataset_name=f"stt4sg_{dial}",
-                path=os.path.join(BASE_DATASET_PATH_SD, dial),
-                meta_file_train="metadata.txt",
-                language=f'ch_{dial}',  # create dial_id
-            )
-        )
+# BASE_DATASET_PATH_SD = "/cluster/data/deri/swissdial"
+#
+# for dial in os.listdir(BASE_DATASET_PATH_SD):
+#     with open(os.path.join(BASE_DATASET_PATH_SD, dial, 'metadata.txt'), "rt", encoding='utf-8') as metadata_file:
+#         nsamples = metadata_file.readlines()
+#         if len(nsamples) < 100:
+#             continue
+#         language = f'ch_{dial}' if not dial == 'ag' else 'zh'
+#         DATASETS_CONFIG_LIST.append(
+#             BaseDatasetConfig(
+#                 formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
+#                 dataset_name=f"stt4sg_{dial}",
+#                 path=os.path.join(BASE_DATASET_PATH_SD, dial),
+#                 meta_file_train="metadata.txt",
+#                 language=f'ch_{dial}',  # create dial_id
+#             )
+#         )
 
 # Define here the dataset that you want to use for the fine-tuning on.
 # config_dataset = BaseDatasetConfig(
@@ -128,9 +131,9 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_0.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_1.wav",  # TODO add samples of ZH Woman
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_2.wav",
+    "/cluster/home/stucksam/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1199.wav",
+    "/cluster/home/stucksam/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1191.wav",
+    "/cluster/home/stucksam/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1095.wav",
 
     # speaker reference to be used in training test sentences
 ]
@@ -155,7 +158,7 @@ def main():
         gpt_use_perceiver_resampler=True,
     )
     # define audio config
-    audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000)
+    audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=16000)
     # training parameters config
     config = GPTTrainerConfig(
         output_path=OUT_PATH,
@@ -181,7 +184,7 @@ def main():
         save_step=1000,
         save_n_checkpoints=1,
         save_checkpoints=True,
-        wandb_entity='deri',
+        wandb_entity="stucksam",
         # target_loss="loss",
         print_eval=False,
         run_eval_steps=2500,

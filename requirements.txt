@@ -22,6 +22,8 @@ mutagen==1.47.0
 flask>=2.0.1
 # deps for inference
 pysbd>=0.3.4
+wandb==0.18.6
+h5py==3.12.1
 # deps for notebooks
 umap-learn>=0.5.1
 pandas>=1.4,<2.0
