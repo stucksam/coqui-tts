@@ -32,7 +32,7 @@ LOGGER_URI = None
 
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
 # OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
-OUT_PATH = "/cluster/data/stucksam/TTS/TTS_CH/trained"
+OUT_PATH = "/cluster/data/stucksam/coqui-tts/TTS/TTS_CH/trained"
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
