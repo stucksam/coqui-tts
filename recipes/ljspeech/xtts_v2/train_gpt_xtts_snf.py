@@ -1,5 +1,7 @@
+import logging
 import os
 import random
+from datetime import datetime
 
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
@@ -11,6 +13,8 @@ from TTS.utils.alt_loggers import WandbLogger
 from TTS.utils.manage import ModelManager
 
 random.seed(240753)
+
+logger = logging.getLogger(__name__)
 
 LANG_MAP = {
     'ch_be': 'Bern',
@@ -120,7 +124,7 @@ TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_F
 XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
 # XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/best_model_55500.pth"  # model.pth file
 
-XTTS_RELOAD = True
+XTTS_RELOAD = False
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -140,6 +144,10 @@ SPEAKER_REFERENCE = [
 
 
 def main():
+    logging.basicConfig(filename=f"{datetime.now().strftime('%Y_%m_%d_%H_%M.log')}", level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logger.info("Started")
+
     # init args and config
     model_args = GPTArgs(
         max_conditioning_length=132300,  # 6 secs
@@ -157,6 +165,9 @@ def main():
         gpt_use_masking_gt_prompt_approach=True,
         gpt_use_perceiver_resampler=True,
     )
+
+    logger.info("GPTArgs generated...")
+
     # define audio config
     audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=16000)
     # training parameters config
@@ -238,10 +249,14 @@ def main():
         ],
     )
 
+    logger.info("GPT Trainer Config generated...")
+
     config.languages += list(LANG_MAP.keys())
 
     if not XTTS_RELOAD:
         model = GPTTrainer.init_from_config(config)
+
+        logger.info("Training new Model...")
 
         new_toks = ['[ch_be]', '[ch_bs]', '[ch_gr]', '[ch_in]', '[ch_os]', '[ch_vs]', '[ch_zh]']
         model.xtts.tokenizer.tokenizer.add_special_tokens(
@@ -269,6 +284,7 @@ def main():
             new_text_head.bias.data[i] = old_th.bias.data[i]
 
     else:
+        logger.info("Loading existing model...")
         model = GPTTrainer.init_from_config(config)
 
     # load training samples
@@ -278,6 +294,7 @@ def main():
         eval_split_max_size=config.eval_split_max_size,
         eval_split_size=config.eval_split_size,
     )
+    logger.info("Loaded tts samples.")
 
     # init the trainer and 🚀
     trainer = Trainer(
@@ -294,6 +311,9 @@ def main():
         train_samples=train_samples,
         eval_samples=eval_samples,
     )
+
+    logger.info("Initialized Trainer...")
+
     trainer.dashboard_logger = WandbLogger(  # pylint: disable=abstract-class-instantiated
         project=config.project_name,
         name=config.run_name,
@@ -303,6 +323,8 @@ def main():
     model.xtts.tokenizer.tokenizer.save(
         path=os.path.join(trainer.output_path, 'vocab.json')
     )
+
+    logger.info("Start fitting")
     trainer.fit()
 
 
