@@ -37,8 +37,8 @@ else
     unset PYTHONPATH
     source "$venv_path/bin/activate"
 
-  pip3 install -e .[all,dev,notebooks]
-  pip3 install wandb h5py
+    pip3 install -e .[all,dev,notebooks]
+    pip3 install wandb h5py
 fi
 
 # see https://github.com/pytorch/pytorch/issues/111469
