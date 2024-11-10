@@ -33,6 +33,7 @@ LOGGER_URI = None
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
 # OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
+DATASETS_PATH = "/scratch/dialects"
 OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
 
 # Training Parameters
@@ -42,15 +43,13 @@ BATCH_SIZE = 12  # set here the batch size
 GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
-BASE_DATASET_PATH = f"{CLUSTER_HOME_PATH}/datasets/dialects"
-
 DATASETS_CONFIG_LIST = []
 
-txt_files = [f for f in os.listdir(BASE_DATASET_PATH) if f.endswith('.txt')]
+txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt')]
 
 for metadata in txt_files:
     dialect_name = metadata.replace(".txt", "")
-    with open(os.path.join(BASE_DATASET_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
+    with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
         if len(nsamples) < 100:  # skip small dialects
             continue
@@ -58,7 +57,7 @@ for metadata in txt_files:
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
                 dataset_name=dialect_name,
-                path=BASE_DATASET_PATH,
+                path=DATASETS_PATH,
                 meta_file_train=metadata,
                 language=LANG_MAP_INV[dialect_name],  # create dial_id
             )
