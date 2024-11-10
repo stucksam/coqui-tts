@@ -80,7 +80,7 @@ cp -r "$SOURCE_DIR" "$DEST_DIR"
 # Optional: Print a message to indicate completion
 echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
-python3 recipes/ljspeech/xtts_v2/main.py
+python3 recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit

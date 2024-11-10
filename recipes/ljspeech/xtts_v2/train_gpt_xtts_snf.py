@@ -1,12 +1,14 @@
-import os, json, random
+import os
+import random
+
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
 
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
-from TTS.utils.manage import ModelManager
 from TTS.utils.alt_loggers import WandbLogger
+from TTS.utils.manage import ModelManager
 
 random.seed(240753)
 
@@ -20,7 +22,7 @@ LANG_MAP = {
     'ch_zh': 'Zürich',
     "de": "Deutschland"
 }
-LANG_MAP_INV = {v:k for k,v in LANG_MAP.items()}
+LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 # Logging parameters
 RUN_NAME = "GPT_XTTS_v2.0_LJSpeech_FT"
@@ -49,11 +51,11 @@ for metadata in txt_files:
     dialect_name = metadata.replace(".txt", "")
     with open(os.path.join(BASE_DATASET_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
-        if len(nsamples) < 100:  #skip small dialects
+        if len(nsamples) < 100:  # skip small dialects
             continue
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
-                formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
+                formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
                 dataset_name=f"stt4sg_{dialect_name}",
                 path=os.path.join(BASE_DATASET_PATH, metadata),
                 meta_file_train=metadata,
