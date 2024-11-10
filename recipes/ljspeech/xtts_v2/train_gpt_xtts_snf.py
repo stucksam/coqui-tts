@@ -95,7 +95,7 @@ for metadata in txt_files:
 
 # Define the path where XTTS v2.0.1 files will be downloaded
 CHECKPOINTS_OUT_PATH = os.path.join(OUT_PATH, "XTTS_v2.0_original_model_files/")
-os.makedirs(CHECKPOINTS_OUT_PATH, exist_ok=True)
+# os.makedirs(CHECKPOINTS_OUT_PATH, exist_ok=True)
 
 # DVAE files
 DVAE_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/dvae.pth"
