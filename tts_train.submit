@@ -19,6 +19,7 @@ venv_path="$venv_base_dir/$env_name"
 
 # create venv base dir if it does not exist
 mkdir -p /raid/persistent_scratch/stucksam/venvs/
+#rm -r $venv_path
 
 # Explicitly load cuda 12.2.2
 module load cuda/12.2.2
@@ -35,9 +36,13 @@ else
     unset PIP_TARGET
     unset PYTHONPATH
     source "$venv_path/bin/activate"
+
+  pip3 install -e .[all,dev,notebooks]
+  pip3 install wandb h5py
 fi
 
-pip3 install -r requirements.txt
+# see https://github.com/pytorch/pytorch/issues/111469
+export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
 # Source and destination directories
 SOURCE_DIR="/cluster/home/stucksam/datasets/dialects"

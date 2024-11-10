@@ -77,7 +77,8 @@ class XTTSDataset(torch.utils.data.Dataset):
             self.h5_paths = {}
             for dataset_config in config.datasets: # TODO: change to my setup
                 # self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
-                self.h5_paths[dataset_config.dataset_name] = os.path.join(dataset_config.path, 'audio.h5')
+                dialect_name = dataset_config.dataset_name
+                self.h5_paths[dialect_name] = os.path.join(dataset_config.path, f"{dialect_name}.hdf5")
 
         assert self.max_wav_len is not None and self.max_text_len is not None
 
@@ -125,7 +126,7 @@ class XTTSDataset(torch.utils.data.Dataset):
         tseq = self.get_text(text, sample["language"])
         audiopath = sample["audio_file"]
         if self.config.use_h5:
-            dataset_name = sample['audio_unique_name'].split('#')[0]
+            dataset_name = sample['audio_unique_name'].split('#')[0]  #TODO how to access dialect
             # if not hasattr(worker_file_handles, 'h5_files'):
             #     worker_file_handles.h5_files = {}
             # if dataset_name not in worker_file_handles.h5_files:

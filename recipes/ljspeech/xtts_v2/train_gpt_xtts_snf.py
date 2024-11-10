@@ -56,8 +56,8 @@ for metadata in txt_files:
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
-                dataset_name=f"stt4sg_{dialect_name}",
-                path=os.path.join(BASE_DATASET_PATH, metadata),
+                dataset_name=dialect_name,
+                path=BASE_DATASET_PATH,
                 meta_file_train=metadata,
                 language=LANG_MAP_INV[dialect_name],  # create dial_id
             )
