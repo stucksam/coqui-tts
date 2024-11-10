@@ -1,16 +1,14 @@
 import os.path
-
-import h5py
 import random
 import sys
+import threading
 
-import librosa
+import h5py
 import torch
 import torch.nn.functional as F
 import torch.utils.data
 
 from TTS.tts.models.xtts import load_audio
-import threading
 
 # Thread-local storage for each worker to keep its HDF5 file handles
 worker_file_handles = threading.local()
@@ -73,9 +71,8 @@ class XTTSDataset(torch.utils.data.Dataset):
         self.max_text_len = model_args.max_text_length
         self.use_masking_gt_prompt_approach = model_args.gpt_use_masking_gt_prompt_approach
         if config.use_h5:
-            #self.h5_files = {}
             self.h5_paths = {}
-            for dataset_config in config.datasets: # TODO: change to my setup
+            for dataset_config in config.datasets:
                 # self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
                 dialect_name = dataset_config.dataset_name
                 self.h5_paths[dialect_name] = os.path.join(dataset_config.path, f"{dialect_name}.hdf5")
@@ -104,9 +101,9 @@ class XTTSDataset(torch.utils.data.Dataset):
                 continue
             # Basically, this audio file is nonexistent or too long to be supported by the dataset.
             if (
-                wav is None
-                or (self.max_wav_len is not None and wav.shape[-1] > self.max_wav_len)
-                or (self.max_text_len is not None and tseq.shape[0] > self.max_text_len)
+                    wav is None
+                    or (self.max_wav_len is not None and wav.shape[-1] > self.max_wav_len)
+                    or (self.max_text_len is not None and tseq.shape[0] > self.max_text_len)
             ):
                 continue
             new_samples.append(sample)
@@ -126,18 +123,11 @@ class XTTSDataset(torch.utils.data.Dataset):
         tseq = self.get_text(text, sample["language"])
         audiopath = sample["audio_file"]
         if self.config.use_h5:
-            dataset_name = sample['audio_unique_name'].split('#')[0]  #TODO how to access dialect
-            # if not hasattr(worker_file_handles, 'h5_files'):
-            #     worker_file_handles.h5_files = {}
-            # if dataset_name not in worker_file_handles.h5_files:
-            #     h5_path = self.h5_paths[dataset_name]
-            #     worker_file_handles.h5_files[dataset_name] = h5py.File(h5_path, 'r')
-            #h5_file = worker_file_handles.h5_files[dataset_name]
+            # combined somewhere to dataset_name#audiofile name
+            dataset_name = sample["audio_unique_name"].split('#')[0]
 
-            with h5py.File(self.h5_paths[dataset_name], 'r') as h5_file:
-                sample_name = os.path.split(sample['audio_unique_name'])[-1]
-                wav = h5_file[sample_name][...]
-                #wav = librosa.resample(wav[...], orig_sr=44100, target_sr=self.sample_rate)
+            with h5py.File(self.h5_paths[dataset_name], "r") as h5_file:
+                wav = h5_file[audiopath][...]  # I put just the sample name in audio file, should be ok
                 wav = torch.tensor(wav[None, :], dtype=torch.float)
         else:
             wav = load_audio(audiopath, self.sample_rate)
@@ -199,9 +189,9 @@ class XTTSDataset(torch.utils.data.Dataset):
 
         # check if the audio and text size limits and if it out of the limits, added it failed_samples
         if (
-            wav is None
-            or (self.max_wav_len is not None and wav.shape[-1] > self.max_wav_len)
-            or (self.max_text_len is not None and tseq.shape[0] > self.max_text_len)
+                wav is None
+                or (self.max_wav_len is not None and wav.shape[-1] > self.max_wav_len)
+                or (self.max_text_len is not None and tseq.shape[0] > self.max_text_len)
         ):
             # Basically, this audio file is nonexistent or too long to be supported by the dataset.
             # It's hard to handle this situation properly. Best bet is to return the a random valid token and skew the dataset somewhat as a result.
