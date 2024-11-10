@@ -40,8 +40,6 @@ GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 BASE_DATASET_PATH = "/cluster/home/stucksam/datasets/dialects"
-with open(os.path.join('/cluster/data/deri/snf_tts/', "speaker_to_dialect.json"), 'rt', encoding='utf-8') as fp:
-    speaker_to_dialect = json.load(fp)
 
 DATASETS_CONFIG_LIST = []
 

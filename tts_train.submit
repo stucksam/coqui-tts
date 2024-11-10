@@ -74,12 +74,13 @@ done
 SOURCE_DIR="/cluster/home/stucksam/datasets/dialects"
 DEST_DIR="/scratch/dialects"
 
+# TODO do concurrently
 cp -r "$SOURCE_DIR" "$DEST_DIR"
 
 # Optional: Print a message to indicate completion
 echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
-python3 main.py
+python3 recipes/ljspeech/xtts_v2/main.py
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit
