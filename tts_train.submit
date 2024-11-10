@@ -1,19 +1,19 @@
 #!/bin/bash
 #SBATCH --time=1440
-#SBATCH --job-name=run_tts_chde_stucksam
+#SBATCH --job-name=run_tts_coqui_stucksam
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:a100sxm:1
 #SBATCH --mem=64G
 #SBATCH --account=cai_nlp
 #SBATCH --partition=p_gpu_all
-#SBATCH --output=/cluster/home/stucksam/log/%j_%N__run_tts_chde_stucksam.out
-#SBATCH --error=/cluster/home/stucksam/log/%j_%N__run_tts_chde_stucksam.err
+#SBATCH --output=/cluster/home/stucksam/log/%j_%N__run_tts_coqui_stucksam.out
+#SBATCH --error=/cluster/home/stucksam/log/%j_%N__run_tts_coqui_stucksam.err
 
 # %j: parses the slurm jobID into the file-name
 # %N: parses the Node name into the file-name
 
-env_name="ma"
+env_name="coqui-tts"
 venv_base_dir="/raid/persistent_scratch/stucksam/venvs"
 venv_path="$venv_base_dir/$env_name"
 
