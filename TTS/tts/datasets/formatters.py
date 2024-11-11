@@ -225,7 +225,9 @@ def ljspeech_custom_dialect_speaker(root_path, meta_file, **kwargs):  # pylint: 
         for line in ttf:
             cols = line.split("\t")
             wav_file = cols[1]
-            speaker = f"{cols[1]}_{cols[3]}"
+            # sample name is set up as EPISODE-UUID_SPLIT-ID, we want EPISODE-UUID
+            podcast_episode_name = cols[1].split("_")[0]
+            speaker = f"{podcast_episode_name}_{cols[3]}"
             items.append({"text": cols[4], "audio_file": wav_file, "speaker_name": speaker, "root_path": root_path})
     return items
 
