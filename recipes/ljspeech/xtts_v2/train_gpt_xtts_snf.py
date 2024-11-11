@@ -256,7 +256,7 @@ def main():
     if not XTTS_RELOAD:
         model = GPTTrainer.init_from_config(config)
 
-        logger.info("Training new Model...")
+        logger.info("Loading new Model...")
 
         new_toks = ['[ch_be]', '[ch_bs]', '[ch_gr]', '[ch_in]', '[ch_os]', '[ch_vs]', '[ch_zh]']
         model.xtts.tokenizer.tokenizer.add_special_tokens(
@@ -286,6 +286,8 @@ def main():
     else:
         logger.info("Loading existing model...")
         model = GPTTrainer.init_from_config(config)
+
+    logger.info("Successfully loaded Model. Loading Training Samples now...")
 
     # load training samples
     train_samples, eval_samples = load_tts_samples(
