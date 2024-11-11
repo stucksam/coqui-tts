@@ -11,6 +11,7 @@ from trainer.utils.distributed import rank_zero_only
 
 if is_wandb_available():
     import wandb  # pylint: disable=import-error
+    wandb.login(key="YOUR_API_KEY")
 
 
 class WandbLogger(BaseDashboardLogger):
