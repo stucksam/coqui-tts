@@ -15,14 +15,18 @@ LANG_MAP = {
 }
 LANG_MAP_INV = {v:k for k,v in LANG_MAP.items()}
 
+CLUSTER_HOME_PATH = "/cluster/home/stucksam"
+DATASETS_PATH = "/scratch/dialects"
+OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
+
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-model_name = "GPT_XTTS_v2.0_LJSpeech_FT-October-26-2024_05+42PM-0000000"
+model_name = "GPT_XTTS_v2.0_LJSpeech_FT-November-11-2024_09+32PM-605fcc21"
 
-model_path = f"/cluster/data/deri/TTS/TTS_CH/trained/{model_name}/"
-config_path = f"/cluster/data/deri/TTS/TTS_CH/trained/{model_name}/config.json"
+model_path = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{model_name}/"
+config_path = model_path + "config.json"
 # Init TTS
 tts = TTS(
     model_path=model_path,
@@ -51,9 +55,9 @@ texts = random.sample(all_texts, k=30)
 speaker_id = 'd2dee463-0eb9-47fa-b739-f1dccd8638f9'
 
 speaker_wavs = [
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_0.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_1.wav",
-    "/cluster/data/deri/snf_tts/text_wavs/d2dee463-0eb9-47fa-b739-f1dccd8638f9_2.wav",
+    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1199.wav",
+    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1191.wav",
+    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1095.wav",
 
     # speaker reference to be used in training test sentences
 ]
@@ -61,7 +65,7 @@ speaker_wavs = [
 #speaker_wavs = [os.path.join(speaker_wavs_base, speaker_id, x) for x in audios]
 
 dial_tags = list(LANG_MAP.keys())
-[os.makedirs(f'ch_test_n/{model_name}/{dial_tag}', exist_ok=True) for dial_tag in dial_tags]
+[os.makedirs(f"ch_test_n/{model_name}/{dial_tag}", exist_ok=True) for dial_tag in dial_tags]
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:

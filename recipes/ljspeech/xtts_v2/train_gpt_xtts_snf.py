@@ -246,6 +246,11 @@ def main():
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_gr',
             },
+            {
+                "text": "Dieser Satz soll auf Hochdeutsch gesprochen werden.",
+                "speaker_wav": SPEAKER_REFERENCE,
+                "language": 'de',
+            },
         ],
     )
 
