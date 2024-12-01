@@ -135,10 +135,9 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1199.wav",
-    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1191.wav",
-    f"{CLUSTER_HOME_PATH}/speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1095.wav",
-
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1199.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1191.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1095.wav",
     # speaker reference to be used in training test sentences
 ]
 
