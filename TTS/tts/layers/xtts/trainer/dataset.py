@@ -131,7 +131,8 @@ class XTTSDataset(torch.utils.data.Dataset):
                 wav = torch.tensor(wav[None, :], dtype=torch.float)
         else:
             wav = load_audio(audiopath, self.sample_rate)
-        if text is None or len(text.strip()) == 0:
+        if text is None or len(text.strip()) == 0 or len(text) >= self.max_text_len:
+            # max length len may be the case on erroneous samples with transcription, e.g. "la la la la la la la ..."
             raise ValueError
         if wav is None or wav.shape[-1] < (0.5 * self.sample_rate):
             # Ultra short clips are also useless (and can cause problems within some models).

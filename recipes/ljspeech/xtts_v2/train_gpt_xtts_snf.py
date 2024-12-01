@@ -242,12 +242,12 @@ def main():
                 "language": 'ch_in',
             },
             {
-                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "text": "Den Weihnachtsbaum haben die Arbeiter sorgfältig über das Wochenende aufgebaut.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_gr',
             },
             {
-                "text": "Dieser Satz soll auf Hochdeutsch gesprochen werden.",
+                "text": "Den Weihnachtsbaum haben die Arbeiter sorgfältig über das Wochenende aufgebaut.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'de',
             },

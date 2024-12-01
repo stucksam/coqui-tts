@@ -3,10 +3,10 @@
 #SBATCH --job-name=run_tts_coqui_stucksam
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:a100sxm:1
+#SBATCH --gres=gpu:h100pcie:4
 #SBATCH --mem=64G
 #SBATCH --account=cai_nlp
-#SBATCH --partition=p_gpu_all
+#SBATCH --partition=p_gpu_high_end
 #SBATCH --output=/cluster/home/stucksam/log/%j_%N__run_tts_coqui_stucksam.out
 #SBATCH --error=/cluster/home/stucksam/log/%j_%N__run_tts_coqui_stucksam.err
 
@@ -54,7 +54,8 @@ cp -r "$SOURCE_DIR" "$DEST_DIR"
 # Optional: Print a message to indicate completion
 echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
-python3 recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py
+# python3 recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py
+python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1,2,3,4,5
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit

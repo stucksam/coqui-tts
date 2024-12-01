@@ -1,6 +1,5 @@
 import random
 
-from pydub import AudioSegment
 import torch, os, csv
 from TTS.api import TTS
 
@@ -13,7 +12,7 @@ LANG_MAP = {
     'ch_vs': 'Wallis',
     'ch_zh': 'Zürich',
 }
-LANG_MAP_INV = {v:k for k,v in LANG_MAP.items()}
+LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 DATASETS_PATH = "/scratch/dialects"
@@ -21,7 +20,6 @@ OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
 
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 model_name = "GPT_XTTS_v2.0_LJSpeech_FT-November-11-2024_09+32PM-605fcc21"
 
@@ -36,7 +34,7 @@ tts = TTS(
 # Run TTS
 # ❗ Since this model is multi-lingual voice cloning model, we must set the target speaker_wav and language
 # Text to speech list of amplitude values as output
-#wav = tts.tts(text="Hello world!", speaker_wav="my/cloning/audio.wav", language="en")
+# wav = tts.tts(text="Hello world!", speaker_wav="my/cloning/audio.wav", language="en")
 # Text to speech to a file
 
 all_texts = set()
@@ -62,13 +60,12 @@ speaker_wavs = [
     # speaker reference to be used in training test sentences
 ]
 
-#speaker_wavs = [os.path.join(speaker_wavs_base, speaker_id, x) for x in audios]
+# speaker_wavs = [os.path.join(speaker_wavs_base, speaker_id, x) for x in audios]
 
 dial_tags = list(LANG_MAP.keys())
 [os.makedirs(f"ch_test_n/{model_name}/{dial_tag}", exist_ok=True) for dial_tag in dial_tags]
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
-        tts.tts_to_file(text=text, speaker_wav=speaker_wavs, language=dial_tag, file_path=f'ch_test_n/{model_name}/{dial_tag}/{tid}.wav')
-
-
+        tts.tts_to_file(text=text, speaker_wav=speaker_wavs, language=dial_tag,
+                        file_path=f'ch_test_n/{model_name}/{dial_tag}/{tid}.wav')
