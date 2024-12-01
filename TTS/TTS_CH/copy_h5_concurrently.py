@@ -13,18 +13,19 @@ LANG_MAP = {
     "de": "Deutschland"
 }
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
-DATASETS_PATH = "/scratch/dialects"
+DATASETS_PATH = "/cluster/home/stucksam/datasets/dialects"
+DIALECT_TRAIN_PATH = "/scratch/dialects"
 
 def copy_dialect(dialect: str):
     print(f"Copying {dialect} to /scratch partition.")
-    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.hdf5"), DATASETS_PATH)
-    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.txt"), DATASETS_PATH)
+    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.hdf5"), DIALECT_TRAIN_PATH)
+    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.txt"), DIALECT_TRAIN_PATH)
     print(f"Finished copying {dialect}.")
 
 
 def copy_dialects_to_cluster_concurrently():
-    if not os.path.exists(DATASETS_PATH):
-        os.makedirs(DATASETS_PATH)
+    if not os.path.exists(DIALECT_TRAIN_PATH):
+        os.makedirs(DIALECT_TRAIN_PATH)
 
     processes = [
         Process(target=copy_dialect, args=(dialect,))
