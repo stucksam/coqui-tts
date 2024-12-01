@@ -3,7 +3,7 @@
 #SBATCH --job-name=run_tts_coqui_stucksam
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:h100pcie:4
+#SBATCH --gres=gpu:h100pcie:2
 #SBATCH --mem=64G
 #SBATCH --account=cai_nlp
 #SBATCH --partition=p_gpu_high_end
@@ -48,14 +48,14 @@ export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlin
 SOURCE_DIR="/cluster/home/stucksam/datasets/dialects"
 DEST_DIR="/scratch/dialects"
 
-# TODO do concurrently
-cp -r "$SOURCE_DIR" "$DEST_DIR"
+python3 TTS/TTS_CH/copy_h5_concurrently.py
 
 # Optional: Print a message to indicate completion
 echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
 # python3 recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py
-python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1,2,3,4,5
+
+python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit
