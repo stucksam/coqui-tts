@@ -120,12 +120,12 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-01-2024_04+59PM-21b10eea"
-# TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
-# XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
+TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+# TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+# XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
 
-XTTS_RELOAD = True
+XTTS_RELOAD = False
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -136,10 +136,17 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1199.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1191.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1095.wav",
-    # speaker reference to be used in training test sentences
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+    # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
 
 
@@ -150,10 +157,10 @@ def main():
 
     # init args and config
     model_args = GPTArgs(
-        max_conditioning_length=132300,  # 6 secs
-        min_conditioning_length=66150,  # 3 secs
+        max_conditioning_length=132300,  # 6 seconds with sr of 22050
+        min_conditioning_length=66150,  # 3 secs with sr of 22050
         debug_loading_failures=False,
-        max_wav_length=331100,  # ~15 seconds
+        max_wav_length=240000,  # ~15 seconds = 240000/16000 -> 16k is sample rate of wavs
         max_text_length=390,
         mel_norm_file=MEL_NORM_FILE,
         dvae_checkpoint=DVAE_CHECKPOINT,
@@ -169,7 +176,10 @@ def main():
     logger.info("GPTArgs generated...")
 
     # define audio config
-    audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=16000)
+    audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
+    logger.info(f"Verifying Sample Rate: {audio_config.sample_rate}")
+    logger.info(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
+    logger.info(f"Verifying Output Sample Rate: {audio_config.output_sample_rate}")
     # training parameters config
     config = GPTTrainerConfig(
         output_path=OUT_PATH,
@@ -187,7 +197,7 @@ def main():
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
         num_loader_workers=2,
-        eval_split_max_size=256,
+        # eval_split_max_size=256,
         eval_split_size=0.02,
         print_step=50,
         plot_step=100,
