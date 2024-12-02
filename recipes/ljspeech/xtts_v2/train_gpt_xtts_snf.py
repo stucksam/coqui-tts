@@ -121,9 +121,9 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-01-2024_04+59PM-21b10eea"
 # TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 # XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
+XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
 
 XTTS_RELOAD = True
 
