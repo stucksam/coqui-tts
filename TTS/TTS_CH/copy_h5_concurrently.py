@@ -3,18 +3,19 @@ import shutil
 from multiprocessing import Process
 
 LANG_MAP = {
-    'ch_be': 'Bern',
-    'ch_bs': 'Basel',
-    'ch_gr': 'Graubünden',
-    'ch_in': 'Innerschweiz',
-    'ch_os': 'Ostschweiz',
-    'ch_vs': 'Wallis',
-    'ch_zh': 'Zürich',
+    "ch_be": "Bern",
+    "ch_bs": "Basel",
+    "ch_gr": "Graubünden",
+    "ch_in": "Innerschweiz",
+    "ch_os": "Ostschweiz",
+    "ch_vs": "Wallis",
+    "ch_zh": "Zürich",
     "de": "Deutschland"
 }
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 DATASETS_PATH = "/cluster/home/stucksam/datasets/dialects"
 DIALECT_TRAIN_PATH = "/scratch/dialects"
+
 
 def copy_dialect(dialect: str):
     print(f"Copying {dialect} to /scratch partition.")
@@ -29,7 +30,7 @@ def copy_dialects_to_cluster_concurrently():
 
     processes = [
         Process(target=copy_dialect, args=(dialect,))
-        for dialect, _ in LANG_MAP_INV.items()
+        for dialect in LANG_MAP_INV.keys()
     ]
 
     for process in processes:

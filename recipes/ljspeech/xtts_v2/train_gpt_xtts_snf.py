@@ -41,7 +41,7 @@ DATASETS_PATH = "/scratch/dialects"
 OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
 
 # Training Parameters
-OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
+OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
 BATCH_SIZE = 12  # set here the batch size
 GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
@@ -119,12 +119,13 @@ TOKENIZER_FILE_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/voca
 XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/model.pth"
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-# TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/vocab.json"  # vocab.json file
-XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-# XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/GPT_XTTS_v2.0_LJSpeech_FT-October-07-2024_11+47AM-fc3e366f/best_model_55500.pth"  # model.pth file
+CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-01-2024_04+59PM-21b10eea"
+# TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+# XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
 
-XTTS_RELOAD = False
+XTTS_RELOAD = True
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
