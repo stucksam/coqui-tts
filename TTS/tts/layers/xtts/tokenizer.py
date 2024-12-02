@@ -597,7 +597,8 @@ class VoiceBpeTokenizer:
 
         self.char_limits = {
             "en": 250,
-            "de": 253,
+            # "de": 253, # see https://github.com/coqui-ai/TTS/issues/1680
+            "de": 390,
             "fr": 273,
             "es": 239,
             "it": 213,
