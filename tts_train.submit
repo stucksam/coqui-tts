@@ -3,7 +3,7 @@
 #SBATCH --job-name=run_tts_coqui_stucksam
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:3
 #SBATCH --cpus-per-task=8
 #SBATCH --nodelist=sacramento
 #SBATCH --mem=64G
@@ -52,12 +52,7 @@ DEST_DIR="/scratch/dialects"
 
 python3 TTS/TTS_CH/copy_h5_concurrently.py
 
-# Optional: Print a message to indicate completion
-echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
-
-# python3 recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py
-
-python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1
+python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1,2
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit

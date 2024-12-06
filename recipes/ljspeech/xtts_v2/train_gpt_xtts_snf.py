@@ -6,6 +6,7 @@ from datetime import datetime
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
 
+from TTS.TTS_CH.copy_h5_concurrently import copy_dialects_to_cluster_concurrently
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
@@ -37,8 +38,12 @@ LOGGER_URI = None
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
 # OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
+OUT_PATH = "/scratch/models"
+# OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
+os.makedirs(OUT_PATH, exist_ok=True)
+
 DATASETS_PATH = "/scratch/dialects"
-OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
+# DATASETS_PATH = f"{CLUSTER_HOME_PATH}\\datasets\\dialects"
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
@@ -47,59 +52,10 @@ BATCH_SIZE = 12  # set here the batch size
 GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
-DATASETS_CONFIG_LIST = []
-
-txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt')]
-
-for metadata in txt_files:
-    dialect_name = metadata.replace(".txt", "")
-    with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
-        nsamples = metadata_file.readlines()
-        if len(nsamples) < 100:  # skip small dialects
-            continue
-        DATASETS_CONFIG_LIST.append(
-            BaseDatasetConfig(
-                formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
-                dataset_name=dialect_name,
-                path=DATASETS_PATH,
-                meta_file_train=metadata,
-                language=LANG_MAP_INV[dialect_name],  # create dial_id
-            )
-        )
-
-# BASE_DATASET_PATH_SD = "/cluster/data/deri/swissdial"
-#
-# for dial in os.listdir(BASE_DATASET_PATH_SD):
-#     with open(os.path.join(BASE_DATASET_PATH_SD, dial, 'metadata.txt'), "rt", encoding='utf-8') as metadata_file:
-#         nsamples = metadata_file.readlines()
-#         if len(nsamples) < 100:
-#             continue
-#         language = f'ch_{dial}' if not dial == 'ag' else 'zh'
-#         DATASETS_CONFIG_LIST.append(
-#             BaseDatasetConfig(
-#                 formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
-#                 dataset_name=f"stt4sg_{dial}",
-#                 path=os.path.join(BASE_DATASET_PATH_SD, dial),
-#                 meta_file_train="metadata.txt",
-#                 language=f'ch_{dial}',  # create dial_id
-#             )
-#         )
-
-# Define here the dataset that you want to use for the fine-tuning on.
-# config_dataset = BaseDatasetConfig(
-#     formatter="ljspeech_custom_speaker",  # create custom formatter with speaker name
-#     dataset_name="dante",
-#     path="/cluster/data/deri/dante_dataset",
-#     meta_file_train="metadata.txt",
-#     language="it",  # create dial_id
-# )
-
-# Add here the configs of the datasets
-# DATASETS_CONFIG_LIST = [config_dataset]
 
 # Define the path where XTTS v2.0.1 files will be downloaded
 CHECKPOINTS_OUT_PATH = os.path.join(OUT_PATH, "XTTS_v2.0_original_model_files/")
-# os.makedirs(CHECKPOINTS_OUT_PATH, exist_ok=True)
+os.makedirs(CHECKPOINTS_OUT_PATH, exist_ok=True)
 
 # DVAE files
 DVAE_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/dvae.pth"
@@ -149,6 +105,29 @@ SPEAKER_REFERENCE = [
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
 
+copy_dialects_to_cluster_concurrently()
+
+DATASETS_CONFIG_LIST = []
+# https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
+
+txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt')]
+
+for metadata in txt_files:
+    dialect_name = metadata.replace(".txt", "")
+    with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
+        nsamples = metadata_file.readlines()
+        if len(nsamples) < 100:  # skip small dialects
+            continue
+        DATASETS_CONFIG_LIST.append(
+            BaseDatasetConfig(
+                formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
+                dataset_name=dialect_name,
+                path=DATASETS_PATH,
+                meta_file_train=metadata,
+                language=LANG_MAP_INV[dialect_name],  # create dial_id
+            )
+        )
+
 
 def main():
     logging.basicConfig(filename=f"{datetime.now().strftime('%Y_%m_%d_%H_%M.log')}", level=logging.INFO)
@@ -177,6 +156,7 @@ def main():
 
     # define audio config
     audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
+    # audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000, resample=True)
     logger.info(f"Verifying Sample Rate: {audio_config.sample_rate}")
     logger.info(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
     logger.info(f"Verifying Output Sample Rate: {audio_config.output_sample_rate}")
