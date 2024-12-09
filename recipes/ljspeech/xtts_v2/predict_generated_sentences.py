@@ -62,7 +62,7 @@ def load_orig_texts() -> list[str]:
 
 
 def get_filenames_of_wavs():
-    return [file for file in os.listdir(f"{OUT_PATH}/{XTTS_MODEL_TRAINED}") if file.endswith(".wav")]
+    return [file for file in os.listdir(GENERATE_SPEECH_PATH) if file.endswith(".wav")]
 
 
 def _setup_german_transcription_model():

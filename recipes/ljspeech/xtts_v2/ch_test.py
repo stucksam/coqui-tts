@@ -72,7 +72,7 @@ dial_tags = list(LANG_MAP.keys())
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs, language=dial_tag,
-                        file_path=f"{OUT_PATH}/{model_name}/generated_speech/{dial_tag}_{tid}.wav")
+                        file_path=f"{OUT_PATH}/{model_name}/generated_speech/{LANG_MAP[dial_tag]}_{tid}.wav")
 
 with open(os.path.join(OUT_PATH, model_name, "texts.txt"), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
