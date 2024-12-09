@@ -1,5 +1,6 @@
 import os
 import random
+import shutil
 
 import torch
 
@@ -18,7 +19,7 @@ LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
-OUT_PATH = "ch_test_n"
+OUT_PATH = "/scratch/ch_test_n"
 
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -67,7 +68,7 @@ speaker_wavs = [
 ]
 
 dial_tags = list(LANG_MAP.keys())
-[os.makedirs(f"{OUT_PATH}/{model_name}/generated_speech", exist_ok=True) for dial_tag in dial_tags]
+os.makedirs(f"{OUT_PATH}/{model_name}/generated_speech", exist_ok=True)
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
@@ -77,3 +78,6 @@ for tid, text in enumerate(texts):
 with open(os.path.join(OUT_PATH, model_name, "texts.txt"), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
         f.write(f"{idx}\t{text}")
+
+shutil.copy2(os.path.join(OUT_PATH, model_name, "generated"), os.path.join(CLUSTER_HOME_PATH, model_name, "generated"))
+shutil.copy2(os.path.join(OUT_PATH, model_name, "texts.txt"), os.path.join(CLUSTER_HOME_PATH, model_name, "texts.txt"))

@@ -105,8 +105,6 @@ SPEAKER_REFERENCE = [
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
 
-copy_dialects_to_cluster_concurrently()
-
 DATASETS_CONFIG_LIST = []
 # https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
 
