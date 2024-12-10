@@ -108,8 +108,8 @@ def transcribe_audio_to_german() -> None:
         results = pipe(audio_batch, batch_size=BATCH_SIZE)
         for idx, text in enumerate(results):
             filename = wav_files[start_idx + idx]
-            dialect = filename.split("_")[0]
-            text_id = int(filename.split("_")[1].replace(".wav", ""))
+            text_id = int(filename.split("_")[0])
+            dialect = filename.split("_")[1].replace(".wav", "")
             generated_samples.append(XTTSDataPoint(filename, text_id, dialect, text))
 
     write_to_file(generated_samples)

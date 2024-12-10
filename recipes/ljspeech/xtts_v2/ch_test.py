@@ -20,6 +20,8 @@ LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
 OUT_PATH = "/scratch/ch_test_n"
+GENERATED_SPEECH_FOLDER = "generated_speech"
+TEXT_METADATA_FILE = "texts.txt"
 
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -41,11 +43,12 @@ tts = TTS(
 # Text to speech to a file
 
 all_texts = set()
-test_meta = "test_sentences.tsv"
-with open(test_meta, 'rt', encoding='utf-8') as f:
+test_meta = "test_sentences.csv"
+test_meta_path = f"{CLUSTER_HOME_PATH}/coqui-tts/recipes/ljspeech/xtts_v2/{test_meta}"
+with open(test_meta_path, 'rt', encoding='utf-8') as f:
     next(f)
     for line in f:
-        sline = line.split('\t')
+        sline = line.split(";")
         text = sline[0]
         all_texts.add(text)
 
@@ -68,16 +71,16 @@ speaker_wavs = [
 ]
 
 dial_tags = list(LANG_MAP.keys())
-os.makedirs(f"{OUT_PATH}/{model_name}/generated_speech", exist_ok=True)
+os.makedirs(f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}", exist_ok=True)
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs, language=dial_tag,
-                        file_path=f"{OUT_PATH}/{model_name}/generated_speech/{LANG_MAP[dial_tag]}_{tid}.wav")
+                        file_path=f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}/{tid}_{LANG_MAP[dial_tag]}.wav")
 
-with open(os.path.join(OUT_PATH, model_name, "texts.txt"), "wt", encoding="utf-8") as f:
+with open(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
         f.write(f"{idx}\t{text}")
 
-shutil.copy2(os.path.join(OUT_PATH, model_name, "generated"), os.path.join(CLUSTER_HOME_PATH, model_name, "generated"))
-shutil.copy2(os.path.join(OUT_PATH, model_name, "texts.txt"), os.path.join(CLUSTER_HOME_PATH, model_name, "texts.txt"))
+shutil.copytree(os.path.join(OUT_PATH, model_name, GENERATED_SPEECH_FOLDER), os.path.join(CLUSTER_HOME_PATH, model_name, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
+shutil.copy2(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, model_name, TEXT_METADATA_FILE))
