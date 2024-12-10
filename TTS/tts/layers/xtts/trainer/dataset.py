@@ -7,10 +7,12 @@ import h5py
 import torch
 import torch.nn.functional as F
 import torch.utils.data
+import torchaudio
 
 from TTS.tts.models.xtts import load_audio
 
 # Thread-local storage for each worker to keep its HDF5 file handles
+H5_SAMPLE_RATE = 16000
 worker_file_handles = threading.local()
 
 torch.set_num_threads(1)
@@ -129,6 +131,8 @@ class XTTSDataset(torch.utils.data.Dataset):
             with h5py.File(self.h5_paths[dataset_name], "r") as h5_file:
                 wav = h5_file[audiopath][...]  # I put just the sample name in audio file, should be ok
                 wav = torch.tensor(wav[None, :], dtype=torch.float)
+                if self.sample_rate != H5_SAMPLE_RATE:
+                    wav = torchaudio.functional.resample(wav, H5_SAMPLE_RATE, self.sample_rate)
         else:
             wav = load_audio(audiopath, self.sample_rate)
         if text is None or len(text.strip()) == 0 or len(text) >= self.max_text_len:

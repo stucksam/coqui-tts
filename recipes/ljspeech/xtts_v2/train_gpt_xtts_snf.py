@@ -153,8 +153,8 @@ def main():
     logger.info("GPTArgs generated...")
 
     # define audio config
-    audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
-    # audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000, resample=True)
+    # audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
+    audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000)
     logger.info(f"Verifying Sample Rate: {audio_config.sample_rate}")
     logger.info(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
     logger.info(f"Verifying Output Sample Rate: {audio_config.output_sample_rate}")
