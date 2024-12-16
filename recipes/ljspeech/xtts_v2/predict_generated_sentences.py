@@ -162,7 +162,7 @@ def transcribe_audio_to_german() -> None:
             audio_batch.append(audio_data)
 
         # Perform transcription
-        results = pipe(audio_batch, batch_size=BATCH_SIZE)
+        results = pipe(audio_batch, batch_size=BATCH_SIZE, chunk_length_s=30.0)
         for idx, text in enumerate(results):
             filename = wav_files[start_idx + idx]
             text_id = int(filename.split("_")[0])
