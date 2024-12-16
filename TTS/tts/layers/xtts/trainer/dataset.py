@@ -121,7 +121,7 @@ class XTTSDataset(torch.utils.data.Dataset):
         return tokens
 
     def load_item(self, sample):
-        text = str(sample["text"])
+        text = str(sample["text"]).strip()
         tseq = self.get_text(text, sample["language"])
         audiopath = sample["audio_file"]
         if self.config.use_h5:

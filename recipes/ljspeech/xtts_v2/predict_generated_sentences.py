@@ -164,6 +164,7 @@ def transcribe_audio_to_german() -> None:
         # Perform transcription
         results = pipe(audio_batch, batch_size=BATCH_SIZE, chunk_length_s=30.0)
         for idx, text in enumerate(results):
+            text = text["text"].strip()
             filename = wav_files[start_idx + idx]
             text_id = int(filename.split("_")[0])
             dialect = filename.split("_")[1].replace(".wav", "")
@@ -201,7 +202,7 @@ def audio_to_phoneme() -> None:
         # Load batch of audio data
         audio_batch = []
         for i in range(start_idx, end_idx):
-            audio_data, _ = librosa.load(f"{GENERATE_SPEECH_PATH}/{metadata[i].sample_name[i]}.wav", sr=None)
+            audio_data, _ = librosa.load(f"{GENERATE_SPEECH_PATH}/{metadata[i].sample_name}.wav", sr=None)
             audio_batch.append(audio_data)
 
         # Run phoneme transcription
