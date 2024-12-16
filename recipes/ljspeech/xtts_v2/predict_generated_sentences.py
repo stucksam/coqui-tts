@@ -1,17 +1,19 @@
 import logging
 import os
+import shutil
 
 import librosa
 import torch
 from joblib import load
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline, Wav2Vec2Processor, Pipeline, Wav2Vec2ForCTC
 
+from recipes.ljspeech.xtts_v2.ch_test import GENERATED_SPEECH_FOLDER, TEXT_METADATA_FILE
 from recipes.ljspeech.xtts_v2.xtts_data_point import XTTSDataPoint
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
-OUT_PATH = "ch_test_n"
+OUT_PATH = "/scratch/ch_test_n"
 
 MODEL_PATH = f"{CLUSTER_HOME_PATH}/swiss-phonemes-tts/src/model"
 MODEL_PATH_DE_CH = f"{MODEL_PATH}/de_to_ch_large_2"
@@ -20,8 +22,8 @@ MODEL_AUDIO_PHONEME = "facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 MODEL_WHISPER_v3 = "openai/whisper-large-v3"
 MODEL_T5_TOKENIZER = "google/t5-v1_1-large"
 
-XTTS_MODEL_TRAINED = "GPT_XTTS_v2.0_LJSpeech_FT-December-04-2024_08+54PM-6202f2fe"
-GENERATE_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/generated_speech"
+XTTS_MODEL_TRAINED = "GPT_XTTS_v2.0_LJSpeech_FT-December-10-2024_06+18PM-5027233c"
+GENERATE_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER}"
 
 MISSING_TEXT = "NO_TEXT"
 MISSING_PHONEME = "NO_PHONEME"
@@ -63,6 +65,18 @@ def load_orig_texts() -> list[str]:
 
 def get_filenames_of_wavs():
     return [file for file in os.listdir(GENERATE_SPEECH_PATH) if file.endswith(".wav")]
+
+
+def copy_files_to_scratch_partition():
+    shutil.copytree(
+        os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, GENERATED_SPEECH_FOLDER),
+        GENERATE_SPEECH_PATH,
+        dirs_exist_ok=True
+    )
+    shutil.copy2(
+        os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE),
+        os.path.join(OUT_PATH, XTTS_MODEL_TRAINED)
+    )
 
 
 def _setup_german_transcription_model():
@@ -163,7 +177,7 @@ def audio_to_phoneme() -> None:
     write_to_file(metadata)
 
 
-def dialect_identification_naive_bayes_majority_voting() -> None:
+def dialect_identification() -> None:
     logger.info("Run Dialect Identification based on phonemes")
     metadata = load_transcribed_metadata()
     num_samples = len(metadata)
@@ -185,5 +199,17 @@ def dialect_identification_naive_bayes_majority_voting() -> None:
     write_to_file(metadata)
 
 
+def main():
+    os.makedirs(GENERATE_SPEECH_PATH, exist_ok=True)
+    copy_files_to_scratch_partition()
+    transcribe_audio_to_german()
+    audio_to_phoneme()
+    dialect_identification()
+    shutil.copy2(
+        os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, "transcribed.txt"),
+        os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED)
+    )
+
+
 if __name__ == "__main__":
-    pass
+    main()

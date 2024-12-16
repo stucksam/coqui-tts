@@ -26,7 +26,7 @@ TEXT_METADATA_FILE = "texts.txt"
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_name = "GPT_XTTS_v2.0_LJSpeech_FT-December-04-2024_08+54PM-6202f2fe"
+model_name = "GPT_XTTS_v2.0_LJSpeech_FT-December-10-2024_06+18PM-5027233c"
 
 model_path = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{model_name}/"
 config_path = model_path + "config.json"
@@ -54,21 +54,21 @@ with open(test_meta_path, 'rt', encoding='utf-8') as f:
 
 all_texts = list(all_texts)
 
-texts = random.sample(all_texts, k=1)
+texts = random.sample(all_texts, k=100)
 
-speaker_wavs = [
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+speaker_wavs = f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav"
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
+
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
-]
+
 
 dial_tags = list(LANG_MAP.keys())
 os.makedirs(f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}", exist_ok=True)
@@ -80,7 +80,7 @@ for tid, text in enumerate(texts):
 
 with open(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
-        f.write(f"{idx}\t{text}")
+        f.write(f"{idx}\t{text}\n")
 
-shutil.copytree(os.path.join(OUT_PATH, model_name, GENERATED_SPEECH_FOLDER), os.path.join(CLUSTER_HOME_PATH, model_name, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
-shutil.copy2(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, model_name, TEXT_METADATA_FILE))
+shutil.copytree(os.path.join(OUT_PATH, model_name, GENERATED_SPEECH_FOLDER), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
+shutil.copy2(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, TEXT_METADATA_FILE))
