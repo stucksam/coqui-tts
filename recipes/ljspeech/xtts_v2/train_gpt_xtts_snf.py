@@ -48,8 +48,8 @@ DATASETS_PATH = "/scratch/dialects"
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
-BATCH_SIZE = 12  # set here the batch size
-GRAD_ACUMM_STEPS = 84  # set here the grad accumulation steps
+BATCH_SIZE = 36  # set here the batch size
+GRAD_ACUMM_STEPS = 14  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 
@@ -75,13 +75,13 @@ TOKENIZER_FILE_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/voca
 XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/model.pth"
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-01-2024_04+59PM-21b10eea"
-TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-# TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
-XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-# XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/best_model_58620.pth"  # model.pth file
+CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-17-2024_04+58PM-10bb5b16"
+# TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+# XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
 
-XTTS_RELOAD = False
+XTTS_RELOAD = True
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -137,7 +137,7 @@ def main():
         max_conditioning_length=132300,  # 6 seconds with sr of 22050
         min_conditioning_length=66150,  # 3 secs with sr of 22050
         debug_loading_failures=False,
-        max_wav_length=240000,  # ~15 seconds = 240000/16000 -> 16k is sample rate of wavs
+        max_wav_length=330750,  # ~15 seconds = 240000/16000 -> 16k is sample rate of wavs -> we now upsample!
         max_text_length=390,
         mel_norm_file=MEL_NORM_FILE,
         dvae_checkpoint=DVAE_CHECKPOINT,
@@ -180,20 +180,20 @@ def main():
         print_step=50,
         plot_step=100,
         log_model_step=1000,
-        save_step=1000,
+        save_step=2000,
         save_n_checkpoints=1,
         save_checkpoints=True,
         wandb_entity="stucksam",
         # target_loss="loss",
         print_eval=False,
-        run_eval_steps=2500,
+        run_eval_steps=2000,
         datasets=DATASETS_CONFIG_LIST,
         shuffle=True,
         # Optimizer values like tortoise, pytorch implementation with modifications to not apply WD to non-weight parameters.
         optimizer="AdamW",
         optimizer_wd_only_on_weights=OPTIMIZER_WD_ONLY_ON_WEIGHTS,
         optimizer_params={"betas": [0.9, 0.96], "eps": 1e-8, "weight_decay": 1e-2},
-        lr=6e-05,  # learning rate
+        lr=6e-05,  # learning rate, maybe change to 0.00018
         lr_scheduler="MultiStepLR",
         # it was adjusted accordly for the new step scheme
         lr_scheduler_params={"milestones": [50000 * 18, 150000 * 18, 300000 * 18], "gamma": 0.5, "last_epoch": -1},

@@ -36,12 +36,12 @@ def copy_dialect(dialect: str, tar_files: bool = False) -> None:
     print(f"Finished copying {dialect}.")
 
 
-def copy_dialects_to_cluster_concurrently() -> None:
+def copy_dialects_to_cluster_concurrently(create_tar: bool = False) -> None:
     if not os.path.exists(DIALECT_TRAIN_PATH):
         os.makedirs(DIALECT_TRAIN_PATH)
 
     processes = [
-        Process(target=copy_dialect, args=(dialect, True))
+        Process(target=copy_dialect, args=(dialect, create_tar))
         for dialect in LANG_MAP_INV.keys()
     ]
 
