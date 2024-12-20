@@ -38,11 +38,11 @@ LOGGER_URI = None
 # Set here the path that the checkpoints will be saved. Default: ./run/training/
 # OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run", "training")
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
-OUT_PATH = "/scratch/models"
+OUT_PATH = "/raid/admin/models"
 # OUT_PATH = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained"
 os.makedirs(OUT_PATH, exist_ok=True)
 
-DATASETS_PATH = "/scratch/dialects"
+DATASETS_PATH = "/raid/admin"
 # DATASETS_PATH = f"{CLUSTER_HOME_PATH}\\datasets\\dialects"
 
 # Training Parameters
@@ -77,9 +77,11 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-17-2024_04+58PM-10bb5b16"
 # TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+# TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+TOKENIZER_FILE = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 # XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
+# XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
+XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
 
 XTTS_RELOAD = True
 
