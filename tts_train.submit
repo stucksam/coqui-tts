@@ -40,9 +40,9 @@ else
     source "$venv_path/bin/activate"
 
     pip3 install -e .[all,dev,notebooks]
-    pip3 install wandb h5py
+    pip3 install wandb h5py openpyxl
 fi
-
+pip3 install openpyxl
 # see https://github.com/pytorch/pytorch/issues/111469
 export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
@@ -54,7 +54,6 @@ export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlin
 #echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
 python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1
-#python3 recipes/ljspeech/xtts_v2/ch_test.py
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit

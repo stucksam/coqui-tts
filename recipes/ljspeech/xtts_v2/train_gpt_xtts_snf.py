@@ -6,7 +6,6 @@ from datetime import datetime
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
 
-from TTS.TTS_CH.copy_h5_concurrently import copy_dialects_to_cluster_concurrently
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
@@ -94,30 +93,38 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
 
 # Training sentences generations
 SPEAKER_REFERENCE = [
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/f074041baa63c2eb4987e1d33aae4ba3a298b5ab7ea8ba22a40a18fac724123b.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/c4fab31bec5f16b1dd466a40c3873791fb27d6298030cb971c97646e0e8864a1.wav",
+    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/9f18f947d8d6292bfc712bf0e3b7af5c5e07441093b098037c94fe796865c7e7.wav"
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
 
 DATASETS_CONFIG_LIST = []
 # https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
 
-txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt')]
+# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith("ch_")]  # training de text
+txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
 
 for metadata in txt_files:
-    dialect_name = metadata.replace(".txt", "")
+    dialect_name = metadata.replace(".txt", "").replace("ch_", "")
+    if dialect_name == "Deutschland":
+        continue
     with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
         if len(nsamples) < 100:  # skip small dialects
             continue
+        else:
+            print(f"loading dialect '{dialect_name}' with {nsamples} samples.")
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
