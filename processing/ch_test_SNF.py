@@ -23,19 +23,20 @@ CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 SPEAKER_DIRECTORY = f"{CLUSTER_HOME_PATH}/_speakers"
 OUT_PATH = "/scratch/ch_test_n"
 GENERATED_SPEECH_FOLDER = "generated_speech"
+DID_REF_FOLDER = "did_speech"
 TEXT_METADATA_FILE = "texts.txt"
 
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_name = "GPT_XTTS_v2.0_Full_3_4"
+model_name = "GPT_XTTS_v2.0_Full_3_5_SNF"
 model_path = f"{CLUSTER_HOME_PATH}/checkpoint/{model_name}/"
 config_path = model_path + "config.json"
 
 all_texts = set()
 test_meta = "SNF_Test_Sentences.xlsx"
 test_meta_path = f"{CLUSTER_HOME_PATH}/coqui-tts/recipes/ljspeech/xtts_v2/data/{test_meta}"
-test_meta_path = f"data/{test_meta}"
+# test_meta_path = f"data/{test_meta}"
 df = pd.read_excel(test_meta_path, sheet_name="SNF Test Samples")
 for index, row in df.iterrows():
     all_texts.add(row["sentence"])
@@ -68,6 +69,7 @@ for dial_tag in dial_tags:
 
 
 os.makedirs(f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}", exist_ok=True)
+os.makedirs(f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}", exist_ok=True)
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
@@ -75,10 +77,19 @@ for tid, text in enumerate(texts):
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs[dial_tag][filtered_df['client_id'].iloc[0]], language=dial_tag,
                         file_path=f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}/{tid}_{LANG_MAP[dial_tag]}.wav")
 
+# needed longer segments per speaker for DID
+for dial_tag in dial_tags:
+    for speaker, ref_wav in speaker_wavs[dial_tag].items():
+        os.makedirs(f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}/{speaker}", exist_ok=True)
+        for tid, text in enumerate(texts):
+            tts.tts_to_file(text=text, speaker_wav=ref_wav, language=dial_tag,
+                            file_path=f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}/{speaker}/{tid}_{LANG_MAP[dial_tag]}.wav")
+
 with open(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
         text_id = df[df["sentence"] == text]["sentence_id"].iloc[0]
         f.write(f"{idx}\t{text}\t{text_id}\n")
 
 shutil.copytree(os.path.join(OUT_PATH, model_name, GENERATED_SPEECH_FOLDER), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
+shutil.copytree(os.path.join(OUT_PATH, model_name, DID_REF_FOLDER), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, DID_REF_FOLDER), dirs_exist_ok=True)
 shutil.copy2(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, TEXT_METADATA_FILE))

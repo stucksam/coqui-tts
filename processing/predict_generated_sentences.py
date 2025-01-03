@@ -1,4 +1,4 @@
-import logging
+import os
 import os
 import shutil
 
@@ -14,10 +14,10 @@ from nltk.translate.bleu_score import sentence_bleu
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline, Wav2Vec2Processor, Pipeline, Wav2Vec2ForCTC
 
+from util import CLUSTER_HOME_PATH, TEXT_TRANSCRIBED_FILE, TEXT_METADATA_FILE, OUT_PATH, XTTS_MODEL_TRAINED, \
+    DID_REF_FOLDER, GENERATED_SPEECH_FOLDER, GENERATE_SPEECH_PATH, XTTSDataPoint, phon_did_cls, ReferenceDatapoint
+
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
-CLUSTER_HOME_PATH = "/cluster/home/stucksam"
-# CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
-OUT_PATH = "/scratch/ch_test_n"
 
 MODEL_PATH = f"{CLUSTER_HOME_PATH}/swiss-phonemes-tts/src/model"
 MODEL_PATH_DE_CH = f"{MODEL_PATH}/de_to_ch_large_2"
@@ -26,103 +26,21 @@ MODEL_AUDIO_PHONEME = "facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 MODEL_WHISPER_v3 = "openai/whisper-large-v3"
 MODEL_T5_TOKENIZER = "google/t5-v1_1-large"
 
-GENERATED_SPEECH_FOLDER = "generated_speech"
-TEXT_METADATA_FILE = "texts.txt"
-TEXT_TRANSCRIBED_FILE = "transcribed.txt"
-
-XTTS_MODEL_TRAINED = "GPT_XTTS_v2.0_Full_3_4"
-GENERATE_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER}"
-
 MISSING_TEXT = "NO_TEXT"
 MISSING_PHONEME = "NO_PHONEME"
 BATCH_SIZE = 32
-LANG_MAP = {
-    'ch_be': 'Bern',
-    'ch_bs': 'Basel',
-    'ch_gr': 'Graubünden',
-    'ch_in': 'Innerschweiz',
-    'ch_os': 'Ostschweiz',
-    'ch_vs': 'Wallis',
-    'ch_zh': 'Zürich',
-}
-phon_did_cls = {0: "Zürich", 1: "Innerschweiz", 2: "Wallis", 3: "Graubünden", 4: "Ostschweiz", 5: "Basel", 6: "Bern",
-                7: "Deutschland"}
-
-logger = logging.getLogger(__name__)
 
 
-class XTTSDataPoint:
-    def __init__(
-            self,
-            sample_name: str,
-            orig_text_id: int,
-            dialect: str,
-            gen_de_text: str,
-            gen_phoneme: str = "",
-            gen_dialect: str = "",
-    ):
-        self.sample_name = sample_name.replace(".wav", "")
-        self.orig_text_id = orig_text_id
-        self.dialect = dialect
-        self.gen_de_text = gen_de_text
-        self.gen_phoneme = gen_phoneme
-        self.gen_dialect = gen_dialect
-
-    @staticmethod
-    def number_of_properties():
-        return 6
-
-    @staticmethod
-    def load_single_datapoint(split_properties: list):
-        return XTTSDataPoint(
-            sample_name=split_properties[0],
-            orig_text_id=int(split_properties[1]),
-            dialect=split_properties[2],
-            gen_de_text=split_properties[3],
-            gen_phoneme=split_properties[4] if len(split_properties) > 4 else "",
-            gen_dialect=split_properties[5] if len(split_properties) > 5 else ""
-        )
-
-    def to_string(self) -> str:
-        to_string = f"{self.sample_name}\t{self.orig_text_id}\t{self.dialect}\t{self.gen_de_text}"
-        if self.gen_phoneme:
-            to_string += f"\t{self.gen_phoneme}"
-        if self.gen_dialect:
-            to_string += f"\t{self.gen_dialect}"
-
-        to_string += "\n"
-        return to_string
-
-
-class ReferenceDatapoint:
-
-    def __init__(self,
-                 sample_id: int,
-                 text: str,
-                 snf_sample_id: str):
-        self.sample_id = sample_id
-        self.text = text
-        self.snf_sample_id = snf_sample_id
-
-    @staticmethod
-    def load_single_ref_datapoint(split_properties: list):
-        return ReferenceDatapoint(sample_id=int(split_properties[0]),
-                                  text=split_properties[1],
-                                  snf_sample_id=split_properties[2]
-                                  )
-
-
-def _setup_gpu_device() -> tuple:
+def setup_gpu_device() -> tuple:
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    logger.info(f"Training / Inference device is: {device}")
     return device, torch_dtype
 
 
 def load_transcribed_metadata() -> list[XTTSDataPoint]:
     metadata = []
-    with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_TRANSCRIBED_FILE), "rt", encoding="utf-8") as f:
-    # with open("data/" + TEXT_TRANSCRIBED_FILE, "rt", encoding="utf-8") as f:
+    # with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_TRANSCRIBED_FILE), "rt", encoding="utf-8") as f:
+    with open("data/" + TEXT_TRANSCRIBED_FILE, "rt", encoding="utf-8") as f:
         for line in f:
             split_line = line.replace('\n', '').split('\t')
             metadata.append(XTTSDataPoint.load_single_datapoint(split_line))
@@ -131,12 +49,25 @@ def load_transcribed_metadata() -> list[XTTSDataPoint]:
 
 def load_reference_sentences() -> list[ReferenceDatapoint]:
     references = []
-    with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE), "rt", encoding="utf-8") as f:
-    # with open("data/" + TEXT_METADATA_FILE, "rt", encoding="utf-8") as f:
+    # with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE), "rt", encoding="utf-8") as f:
+    with open("data/" + TEXT_METADATA_FILE, "rt", encoding="utf-8") as f:
         for line in f:
             split_line = line.replace('\n', '').split('\t')
             references.append(ReferenceDatapoint.load_single_ref_datapoint(split_line))
     return references
+
+
+def load_phoneme_for_did() -> dict:
+    phonemes = {}
+    with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, DID_REF_FOLDER, TEXT_TRANSCRIBED_FILE), "r",
+              encoding="utf-8") as f:
+        for line in f:
+            split_line = line.replace('\n', '').split('\t')
+            speaker = split_line[0].split("_")[0]
+            if speaker not in phonemes:
+                phonemes[speaker] = ""
+            phonemes[speaker] += f"{split_line[1].replace(' ', '')} "
+    return phonemes
 
 
 def write_to_file(content: list[XTTSDataPoint]) -> None:
@@ -161,14 +92,29 @@ def copy_files_to_scratch_partition():
         GENERATE_SPEECH_PATH,
         dirs_exist_ok=True
     )
+    did_samples_path = os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, DID_REF_FOLDER)
+    if os.path.exists(did_samples_path):
+        shutil.copytree(
+            did_samples_path,
+            os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, DID_REF_FOLDER),
+            dirs_exist_ok=True
+        )
+
     shutil.copy2(
         os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE),
         os.path.join(OUT_PATH, XTTS_MODEL_TRAINED)
     )
+    transcribe_path = os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED,
+                                   TEXT_TRANSCRIBED_FILE)
+    if os.path.exists(transcribe_path):
+        shutil.copy2(
+            transcribe_path,
+            os.path.join(OUT_PATH, XTTS_MODEL_TRAINED)
+        )
 
 
 def _setup_german_transcription_model():
-    device, torch_dtype = _setup_gpu_device()
+    device, torch_dtype = setup_gpu_device()
     # could do more finetuning under "or more control over the generation parameters, use the model + processor API directly: "
     # in https://github.com/huggingface/distil-whisper/blob/main/README.md
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -191,7 +137,6 @@ def _setup_german_transcription_model():
 
 def transcribe_audio_to_german() -> None:
     # You seem to be using the pipelines sequentially on GPU. In order to maximize efficiency please use a dataset
-    logger.info("Transcribing to WAV to German")
     wav_files = get_filenames_of_wavs()
     num_samples = len(wav_files)
 
@@ -219,7 +164,7 @@ def transcribe_audio_to_german() -> None:
 
 
 def _setup_phoneme_model() -> Pipeline:
-    device, torch_dtype = _setup_gpu_device()
+    device, torch_dtype = setup_gpu_device()
 
     processor = Wav2Vec2Processor.from_pretrained(MODEL_AUDIO_PHONEME)
     model = Wav2Vec2ForCTC.from_pretrained(MODEL_AUDIO_PHONEME)
@@ -235,10 +180,7 @@ def _setup_phoneme_model() -> Pipeline:
 
 
 def audio_to_phoneme() -> None:
-    logger.info("Transcribing WAV to phoneme.")
-
     pipe = _setup_phoneme_model()
-
     metadata = load_transcribed_metadata()
     num_samples = len(metadata)
 
@@ -257,17 +199,57 @@ def audio_to_phoneme() -> None:
         for idx, result in enumerate(results):
             phoneme = result["text"].strip()
             if phoneme == "":
-                logger.error(
-                    f"NO PHONEME TRANSCRIPT GENERATED FOR {metadata[start_idx + idx].sample_name}")
                 phoneme = MISSING_PHONEME
             metadata[start_idx + idx].gen_phoneme = phoneme
-            logger.info(f"NAME: {metadata[start_idx + idx].sample_name}, PHON: {phoneme}")
 
     write_to_file(metadata)
 
 
+def audio_to_phoneme_for_did() -> None:
+    pipe = _setup_phoneme_model()
+
+    samples = []
+    path = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{DID_REF_FOLDER}"
+    speakers = os.listdir(path)
+    for speaker in speakers:
+        speaker_dir = f"{path}/{speaker}"
+        if not os.path.isdir(speaker_dir):
+            continue
+        ref_wavs = os.listdir(speaker_dir)
+        samples.extend([f"{speaker_dir}/{wav}" for wav in ref_wavs])
+
+    num_samples = len(samples)
+
+    save = []
+    for start_idx in range(0, num_samples, BATCH_SIZE):
+        end_idx = min(start_idx + BATCH_SIZE, num_samples)
+        # Load batch of audio data
+        audio_batch = []
+        for i in range(start_idx, end_idx):
+            audio_data, _ = librosa.load(samples[i], sr=None)
+            audio_batch.append(audio_data)
+
+        # Run phoneme transcription
+        results = pipe(audio_batch, batch_size=BATCH_SIZE)
+
+        # Save results to collection
+        for idx, result in enumerate(results):
+            phoneme = result["text"].strip()
+            if phoneme == "":
+                phoneme = MISSING_PHONEME
+            sample_id = "_".join(samples[start_idx + idx].split("/")[-2:]).replace(".wav", "")
+            save.append((sample_id, phoneme))
+    with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, DID_REF_FOLDER, TEXT_TRANSCRIBED_FILE), "wt",
+              encoding="utf-8") as f:
+        for line in save:
+            f.write(f"{line[0]}\t{line[1]}\n")
+    shutil.copy2(
+        os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, DID_REF_FOLDER, TEXT_TRANSCRIBED_FILE),
+        os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, DID_REF_FOLDER)
+    )
+
+
 def dialect_identification() -> None:
-    logger.info("Run Dialect Identification based on phonemes")
     metadata = load_transcribed_metadata()
     num_samples = len(metadata)
 
@@ -283,7 +265,38 @@ def dialect_identification() -> None:
         for idx, result in enumerate(predicted):
             did = phon_did_cls[result]
             metadata[start_idx + idx].gen_dialect = did
-            logger.info(f"NAME: {metadata[start_idx + idx].sample_name}, DID: {did}")
+
+    write_to_file(metadata)
+
+
+def dialect_identification_multiple_samples() -> None:
+    metadata = load_transcribed_metadata()
+    references = load_reference_sentences()
+    phoneme_per_speaker = load_phoneme_for_did()
+    test_meta = "SNF_Test_Sentences.xlsx"
+    test_meta_path = f"/coqui-tts/recipes/ljspeech/xtts_v2/data/{test_meta}"
+    df = pd.read_excel(test_meta_path, sheet_name="SNF Test Samples")
+
+    num_samples = len(metadata)
+
+    text_clf = load(MODEL_PATH_DID)
+    text_clf['clf'].set_params(n_jobs=BATCH_SIZE)
+
+    for start_idx in range(0, num_samples, BATCH_SIZE):
+        end_idx = min(start_idx + BATCH_SIZE, num_samples)
+        phonemes = []
+        for i in range(start_idx, end_idx):
+            clip = metadata[i]
+            text = [ref.text for ref in references if ref.sample_id == clip.orig_text_id][0]
+            speaker = df[(df["dialect_region"] == clip.dialect) & (df["sentence"] == text)]["client_id"]
+            print(speaker)
+            phonemes.append(phoneme_per_speaker[speaker.iloc[0]])
+
+        predicted = text_clf.predict(phonemes)
+
+        for idx, result in enumerate(predicted):
+            did = phon_did_cls[result]
+            metadata[start_idx + idx].gen_dialect = did
 
     write_to_file(metadata)
 
@@ -314,6 +327,11 @@ def calculate_scores(comparison: pd.DataFrame):
     hypothesis_split = [hyp.split(" ") for hyp in comparison["hypothesis"]]
     bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
     comparison["bleu_score"] = bleu_scores
+
+    reference_split = [ref.lower().split(" ") for ref in comparison["reference"]]
+    hypothesis_split = [hyp.lower().split(" ") for hyp in comparison["hypothesis"]]
+    bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
+    comparison["bleu_score_lower"] = bleu_scores
     return pd.DataFrame(comparison)
 
 
@@ -374,12 +392,21 @@ def analyze_predictions():
     analyze_did()
 
 
-def main():
+def main(analyze_for_did: bool = False):
     os.makedirs(GENERATE_SPEECH_PATH, exist_ok=True)
     copy_files_to_scratch_partition()
     transcribe_audio_to_german()
     audio_to_phoneme()
-    dialect_identification()
+    if analyze_for_did:
+        audio_to_phoneme_for_did()
+        dialect_identification_multiple_samples()
+        shutil.copy2(
+            os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, DID_REF_FOLDER, TEXT_TRANSCRIBED_FILE),
+            os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, DID_REF_FOLDER)
+        )
+    else:
+        dialect_identification()
+
     shutil.copy2(
         os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_TRANSCRIBED_FILE),
         os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED)
@@ -400,4 +427,5 @@ def add_sentence_id():
 
 
 if __name__ == "__main__":
-    main()
+    # main(True)
+    analyze_predictions()
