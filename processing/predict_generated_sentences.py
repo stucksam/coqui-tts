@@ -1,12 +1,10 @@
 import os
-import os
 import shutil
 
 import jiwer
 import librosa
 import pandas as pd
 import seaborn as sns
-import torch
 from bert_score import score as bert_score
 from joblib import load
 from matplotlib import pyplot as plt
@@ -15,7 +13,8 @@ from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline, Wav2Vec2Processor, Pipeline, Wav2Vec2ForCTC
 
 from util import CLUSTER_HOME_PATH, TEXT_TRANSCRIBED_FILE, TEXT_METADATA_FILE, OUT_PATH, XTTS_MODEL_TRAINED, \
-    DID_REF_FOLDER, GENERATED_SPEECH_FOLDER, GENERATE_SPEECH_PATH, XTTSDataPoint, phon_did_cls, ReferenceDatapoint
+    DID_REF_FOLDER, GENERATED_SPEECH_FOLDER, GENERATED_SPEECH_PATH, XTTSDataPoint, phon_did_cls, ReferenceDatapoint, \
+    setup_gpu_device
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 
@@ -29,12 +28,6 @@ MODEL_T5_TOKENIZER = "google/t5-v1_1-large"
 MISSING_TEXT = "NO_TEXT"
 MISSING_PHONEME = "NO_PHONEME"
 BATCH_SIZE = 32
-
-
-def setup_gpu_device() -> tuple:
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    return device, torch_dtype
 
 
 def load_transcribed_metadata() -> list[XTTSDataPoint]:
@@ -83,13 +76,13 @@ def load_orig_texts() -> list[str]:
 
 
 def get_filenames_of_wavs():
-    return [file for file in os.listdir(GENERATE_SPEECH_PATH) if file.endswith(".wav")]
+    return [file for file in os.listdir(GENERATED_SPEECH_PATH) if file.endswith(".wav")]
 
 
 def copy_files_to_scratch_partition():
     shutil.copytree(
         os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, GENERATED_SPEECH_FOLDER),
-        GENERATE_SPEECH_PATH,
+        GENERATED_SPEECH_PATH,
         dirs_exist_ok=True
     )
     did_samples_path = os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, DID_REF_FOLDER)
@@ -148,7 +141,7 @@ def transcribe_audio_to_german() -> None:
         # Load batch of audio data
         audio_batch = []
         for i in range(start_idx, end_idx):
-            audio_data, _ = librosa.load(f"{GENERATE_SPEECH_PATH}/{wav_files[i]}", sr=None)
+            audio_data, _ = librosa.load(f"{GENERATED_SPEECH_PATH}/{wav_files[i]}", sr=None)
             audio_batch.append(audio_data)
 
         # Perform transcription
@@ -189,7 +182,7 @@ def audio_to_phoneme() -> None:
         # Load batch of audio data
         audio_batch = []
         for i in range(start_idx, end_idx):
-            audio_data, _ = librosa.load(f"{GENERATE_SPEECH_PATH}/{metadata[i].sample_name}.wav", sr=None)
+            audio_data, _ = librosa.load(f"{GENERATED_SPEECH_PATH}/{metadata[i].sample_name}.wav", sr=None)
             audio_batch.append(audio_data)
 
         # Run phoneme transcription
@@ -274,7 +267,7 @@ def dialect_identification_multiple_samples() -> None:
     references = load_reference_sentences()
     phoneme_per_speaker = load_phoneme_for_did()
     test_meta = "SNF_Test_Sentences.xlsx"
-    test_meta_path = f"/coqui-tts/recipes/ljspeech/xtts_v2/data/{test_meta}"
+    test_meta_path = f"/coqui-tts/processing/data/{test_meta}"
     df = pd.read_excel(test_meta_path, sheet_name="SNF Test Samples")
 
     num_samples = len(metadata)
@@ -393,7 +386,7 @@ def analyze_predictions():
 
 
 def main(analyze_for_did: bool = False):
-    os.makedirs(GENERATE_SPEECH_PATH, exist_ok=True)
+    os.makedirs(GENERATED_SPEECH_PATH, exist_ok=True)
     copy_files_to_scratch_partition()
     transcribe_audio_to_german()
     audio_to_phoneme()

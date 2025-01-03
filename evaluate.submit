@@ -30,13 +30,11 @@ echo --------------------------------
 echo Run container
 echo --------------------------------
 sarus run --mount=type=bind,source=/cluster/home/stucksam/coqui-tts,destination=/coqui-tts \
-          --mount=type=bind,source=/cluster/home/stucksam/datasets,target=/cluster/home/stucksam/datasets \
-          --mount=type=bind,source=/cluster/home/stucksam/generated_speech,target=/cluster/home/stucksam/generated_speech \
-          --mount=type=bind,source=/cluster/home/stucksam/swiss-phonemes-tts,target=/cluster/home/stucksam/swiss-phonemes-tts \
+          --mount=type=bind,source=/cluster/home/stucksam,target=/cluster/home/stucksam \
           --mount=type=bind,source=/scratch,target=/scratch \
           --workdir=/coqui-tts \
           stucksam01/tts-chde:0.0.4 \
-          python3 recipes/ljspeech/xtts_v2/predict_generated_sentences.py
+          python3 processing/predict_generated_sentences.py
 
 # submit the job:
 # sbatch <path-to-submit-file>/docker.submit

@@ -5,6 +5,7 @@ import torch
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
 OUT_PATH = "/scratch/ch_test_n"
+SPEAKER_DIRECTORY = f"{CLUSTER_HOME_PATH}/_speakers"
 
 GENERATED_SPEECH_FOLDER = "generated_speech"
 DID_REF_FOLDER = "did_speech"
@@ -12,7 +13,8 @@ TEXT_METADATA_FILE = "texts.txt"
 TEXT_TRANSCRIBED_FILE = "transcribed.txt"
 
 XTTS_MODEL_TRAINED = "GPT_XTTS_v2.0_Full_3_5_SNF"
-GENERATE_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER}"
+GENERATED_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER}"
+DID_REF_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{DID_REF_FOLDER}"
 
 LANG_MAP = {
     'ch_be': 'Bern',
@@ -89,9 +91,8 @@ class ReferenceDatapoint:
                                   )
 
 
-def _setup_gpu_device() -> tuple:
+def setup_gpu_device() -> tuple:
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    logger.info(f"Training / Inference device is: {device}")
     return device, torch_dtype
 

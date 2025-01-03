@@ -1,27 +1,13 @@
 import os
-import random
 import shutil
 
 import pandas as pd
 import torch
 
 from TTS.api import TTS
+from processing.util import XTTS_MODEL_TRAINED, GENERATED_SPEECH_PATH, DID_REF_PATH, LANG_MAP
+from util import SPEAKER_DIRECTORY, CLUSTER_HOME_PATH, OUT_PATH
 
-LANG_MAP = {
-    'ch_be': 'Bern',
-    'ch_bs': 'Basel',
-    'ch_gr': 'Graubünden',
-    'ch_in': 'Innerschweiz',
-    'ch_os': 'Ostschweiz',
-    'ch_vs': 'Wallis',
-    'ch_zh': 'Zürich',
-}
-LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
-
-CLUSTER_HOME_PATH = "/cluster/home/stucksam"
-# CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
-SPEAKER_DIRECTORY = f"{CLUSTER_HOME_PATH}/_speakers"
-OUT_PATH = "/scratch/ch_test_n"
 GENERATED_SPEECH_FOLDER = "generated_speech"
 DID_REF_FOLDER = "did_speech"
 TEXT_METADATA_FILE = "texts.txt"
@@ -29,8 +15,8 @@ TEXT_METADATA_FILE = "texts.txt"
 # Get device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_name = "GPT_XTTS_v2.0_Full_3_5_SNF"
-model_path = f"{CLUSTER_HOME_PATH}/checkpoint/{model_name}/"
+model_path = f"{CLUSTER_HOME_PATH}/checkpoint/{XTTS_MODEL_TRAINED}/"
+
 config_path = model_path + "config.json"
 
 all_texts = set()
@@ -68,28 +54,28 @@ for dial_tag in dial_tags:
         speaker_wavs[dial_tag][ref] = [f"{ref_path}/{ref}/{wav}" for wav in wav_files]
 
 
-os.makedirs(f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}", exist_ok=True)
-os.makedirs(f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}", exist_ok=True)
+os.makedirs(GENERATED_SPEECH_PATH, exist_ok=True)
+os.makedirs(DID_REF_PATH, exist_ok=True)
 
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
         filtered_df = df[(df["dialect_region"] == LANG_MAP[dial_tag]) & (df["sentence"] == text)]
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs[dial_tag][filtered_df['client_id'].iloc[0]], language=dial_tag,
-                        file_path=f"{OUT_PATH}/{model_name}/{GENERATED_SPEECH_FOLDER}/{tid}_{LANG_MAP[dial_tag]}.wav")
+                        file_path=f"{GENERATED_SPEECH_PATH}/{tid}_{LANG_MAP[dial_tag]}.wav")
 
 # needed longer segments per speaker for DID
 for dial_tag in dial_tags:
     for speaker, ref_wav in speaker_wavs[dial_tag].items():
-        os.makedirs(f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}/{speaker}", exist_ok=True)
+        os.makedirs(f"{DID_REF_PATH}/{speaker}", exist_ok=True)
         for tid, text in enumerate(texts):
             tts.tts_to_file(text=text, speaker_wav=ref_wav, language=dial_tag,
-                            file_path=f"{OUT_PATH}/{model_name}/{DID_REF_FOLDER}/{speaker}/{tid}_{LANG_MAP[dial_tag]}.wav")
+                            file_path=f"{DID_REF_PATH}/{speaker}/{tid}_{LANG_MAP[dial_tag]}.wav")
 
-with open(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
+with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
         text_id = df[df["sentence"] == text]["sentence_id"].iloc[0]
         f.write(f"{idx}\t{text}\t{text_id}\n")
 
-shutil.copytree(os.path.join(OUT_PATH, model_name, GENERATED_SPEECH_FOLDER), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
-shutil.copytree(os.path.join(OUT_PATH, model_name, DID_REF_FOLDER), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, DID_REF_FOLDER), dirs_exist_ok=True)
-shutil.copy2(os.path.join(OUT_PATH, model_name, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, TEXT_METADATA_FILE))
+shutil.copytree(GENERATED_SPEECH_PATH, os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, GENERATED_SPEECH_FOLDER), dirs_exist_ok=True)
+shutil.copytree(DID_REF_PATH, os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED, DID_REF_FOLDER), dirs_exist_ok=True)
+shutil.copy2(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE), os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, model_name, TEXT_METADATA_FILE))
