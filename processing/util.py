@@ -1,5 +1,3 @@
-import os
-
 import torch
 
 CLUSTER_HOME_PATH = "/cluster/home/stucksam"
@@ -15,6 +13,11 @@ TEXT_TRANSCRIBED_FILE = "transcribed.txt"
 XTTS_MODEL_TRAINED = "GPT_XTTS_v2.0_Full_3_5_SNF"
 GENERATED_SPEECH_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER}"
 DID_REF_PATH = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{DID_REF_FOLDER}"
+
+GENERATED_SPEECH_FOLDER_LONG = GENERATED_SPEECH_FOLDER + "_long"
+GENERATED_SPEECH_PATH_LONG = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER_LONG}"
+TEXT_METADATA_FILE_LONG = TEXT_METADATA_FILE.replace(".txt", "_long.txt")
+TEXT_TRANSCRIBED_FILE_LONG = TEXT_TRANSCRIBED_FILE.replace(".txt", "_long.txt")
 
 LANG_MAP = {
     'ch_be': 'Bern',
@@ -96,3 +99,22 @@ def setup_gpu_device() -> tuple:
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     return device, torch_dtype
 
+
+def load_transcribed_metadata(path: str) -> list[XTTSDataPoint]:
+    metadata = []
+    with open(path, "rt", encoding="utf-8") as f:
+        # with open("data/" + paths["transcribed"], "rt", encoding="utf-8") as f:
+        for line in f:
+            split_line = line.replace('\n', '').split('\t')
+            metadata.append(XTTSDataPoint.load_single_datapoint(split_line))
+    return metadata
+
+
+def load_reference_sentences(path: str) -> list[ReferenceDatapoint]:
+    references = []
+    with open(path, "rt", encoding="utf-8") as f:
+        # with open("data/" + paths["text"], "rt", encoding="utf-8") as f:
+        for line in f:
+            split_line = line.replace('\n', '').split('\t')
+            references.append(ReferenceDatapoint.load_single_ref_datapoint(split_line))
+    return references

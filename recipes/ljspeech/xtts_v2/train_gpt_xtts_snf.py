@@ -74,15 +74,15 @@ TOKENIZER_FILE_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/voca
 XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/model.pth"
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-17-2024_04+58PM-10bb5b16"
-# TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+# CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-January-02-2025_12+48AM-29be0cb8/"
+TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
 # TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
-TOKENIZER_FILE = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
-# XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+# TOKENIZER_FILE = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
+XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
 # XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
-XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
+# XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_58000.pth"  # model.pth file
 
-XTTS_RELOAD = True
+XTTS_RELOAD = False
 
 # download XTTS v2.0 files if needed
 if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -112,19 +112,19 @@ SPEAKER_REFERENCE = [
 DATASETS_CONFIG_LIST = []
 # https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
 
-# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith("ch_")]  # training de text
-txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
+# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith(("ch_", "token_counted_", "more_than_6_"))]  # training de text
+txt_files = [f for f in os.listdir(DATASETS_PATH) if
+             f.endswith('.txt') and f.startswith("more_than_6_")]  # training de text
+# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
 
 for metadata in txt_files:
-    dialect_name = metadata.replace(".txt", "").replace("ch_", "")
-    if dialect_name == "Deutschland":
-        continue
+    dialect_name = metadata.replace(".txt", "").replace("more_than_6_", "")
     with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
         if len(nsamples) < 100:  # skip small dialects
             continue
         else:
-            print(f"loading dialect '{dialect_name}' with {nsamples} samples.")
+            print(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
