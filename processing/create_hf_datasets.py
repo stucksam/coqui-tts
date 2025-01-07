@@ -102,5 +102,5 @@ def save_to_dataset(path, speech_folder: str = "/generated_speech"):
 
 
 if __name__ == "__main__":
-    save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_5_SNF")
+    save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_4")
     # save_ref_dataset()

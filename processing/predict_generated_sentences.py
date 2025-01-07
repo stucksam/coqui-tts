@@ -32,10 +32,12 @@ BATCH_SIZE = 32
 
 
 def load_transcribed_metadata_from_dict(paths: dict) -> list[XTTSDataPoint]:
+    # return load_transcribed_metadata("data/" + paths["transcribed"])
     return load_transcribed_metadata(str(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths["transcribed"])))
 
 
 def load_reference_sentences_from_dict(paths: dict) -> list[ReferenceDatapoint]:
+    # return load_reference_sentences("data/" + paths["text"])
     return load_reference_sentences(str(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths["text"])))
 
 
@@ -55,12 +57,6 @@ def write_to_file(content: list[XTTSDataPoint], paths: dict) -> None:
     with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths["transcribed"]), "wt", encoding="utf-8") as f:
         for line in content:
             f.write(line.to_string())
-
-
-def load_orig_texts() -> list[str]:
-    with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, "texts.txt"), "rt", encoding="utf-8") as f:
-        texts = [text.split("\t")[1] for text in f]
-    return texts
 
 
 def get_filenames_of_wavs(paths: dict):

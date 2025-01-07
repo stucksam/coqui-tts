@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=1440
-#SBATCH --job-name=run_docker_tts_stucksam
+#SBATCH --job-name=run_docker_tts_evaluate_stucksam
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
