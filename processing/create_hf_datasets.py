@@ -101,6 +101,111 @@ def save_to_dataset(path, speech_folder: str = "/generated_speech"):
     dataset.save_to_disk(f"{path}/dataset")
 
 
+def save_conditioning_to_dataset():
+    audio_folder = "speakers/"
+
+    paths = []
+    speaker_ids = []
+    dialects = []
+    sample_ids = []
+    names = []
+    texts = []
+    genders = []
+    durations = []
+
+    test_meta = "test.tsv"
+    test_meta_path = f"processing/data/{test_meta}"
+    df = pd.read_csv(test_meta_path, sep="\t")
+
+    for dial_tag in LANG_MAP.keys():
+        path = f"{audio_folder}/{dial_tag}/references"
+        dialect = LANG_MAP[dial_tag]
+        for speaker in os.listdir(path):
+            speaker_path = f"{path}/{speaker}"
+            for wav in os.listdir(speaker_path):
+                sample_id = wav.replace(".wav", "")
+                print(f"{speaker}: {dialect} -> {sample_id}")
+                filtered = df[
+                    (df["dialect_region"] == dialect) & (df["client_id"] == speaker) & (df["sample_id"] == sample_id)]
+
+                file_path = f"{speaker_path}/{wav}"
+                paths.append(file_path)
+                names.append(f"{dialect}_{sample_id}")
+                speaker_ids.append(speaker)
+                dialects.append(dialect)
+                sample_ids.append(sample_id)
+                texts.append(filtered["sentence"].iloc[0])
+                genders.append(filtered["gender"].iloc[0])
+                durations.append(filtered["duration"].iloc[0])
+
+    # Create a Dataset
+    data = {"audio": paths, "name": names, "speaker_id": speaker_ids, "dialect": dialects, "sample_id": sample_ids,
+            "text": texts, "gender": genders, "duration": durations}
+    dataset = Dataset.from_dict(data)
+
+    # Cast the 'audio' column to the Audio feature type
+    dataset = dataset.cast_column("audio", Audio(sampling_rate=24000))
+    # Inspect the dataset
+    print(dataset)
+
+    # Save the dataset to disk
+    dataset.save_to_disk(f"{audio_folder}/cond_dataset")
+
+
+def save_snf_to_dataset():
+    audio_folder = "speakers/clips__test"
+
+    paths = []
+    speaker_ids = []
+    dialects = []
+    sample_ids = []
+    names = []
+    texts = []
+    genders = []
+    durations = []
+
+    test_meta = "test.tsv"
+    test_meta_path = f"processing/data/{test_meta}"
+    df_test = pd.read_csv(test_meta_path, sep="\t")
+
+    test_meta = "SNF_Test_Sentences.xlsx"
+    test_meta_path = f"processing/data/{test_meta}"
+    df_xtts = pd.read_excel(test_meta_path, sheet_name="SNF Test Samples")
+
+    speakers = set(df_xtts["client_id"])
+    for speaker in speakers:
+        path = f"{audio_folder}/{speaker}"
+        for wav in os.listdir(path):
+            sample_id = wav.replace(".mp3", "")
+            filtered = df_test[
+                (df_test["client_id"] == speaker) & (df_test["sample_id"] == sample_id)]
+            dialect = filtered["dialect_region"].iloc[0]
+
+            paths.append(f"{path}/{wav}")
+            names.append(f"{dialect}_{sample_id}")
+            speaker_ids.append(speaker)
+            dialects.append(dialect)
+            sample_ids.append(sample_id)
+            texts.append(filtered["sentence"].iloc[0])
+            genders.append(filtered["gender"].iloc[0])
+            durations.append(filtered["duration"].iloc[0])
+
+    # Create a Dataset
+    data = {"audio": paths, "name": names, "speaker_id": speaker_ids, "dialect": dialects, "sample_id": sample_ids,
+            "text": texts, "gender": genders, "duration": durations}
+    dataset = Dataset.from_dict(data)
+
+    # Cast the 'audio' column to the Audio feature type
+    dataset = dataset.cast_column("audio", Audio(sampling_rate=24000))
+    # Inspect the dataset
+    print(dataset)
+
+    # Save the dataset to disk
+    dataset.save_to_disk(f"{audio_folder}/snf_dataset")
+
+
 if __name__ == "__main__":
-    save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_4")
+    # save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_4")
+    save_conditioning_to_dataset()
+    # save_snf_to_dataset()
     # save_ref_dataset()

@@ -329,12 +329,14 @@ def analyze_sentence(paths: dict):
     comparison = []
     for clip in meta_data:
         ref = [entry for entry in references if entry.sample_id == clip.orig_text_id][0]
+        speaker_id = df[(df["dialect_region"] == clip.dialect) & (df["sentence_id"] == ref.snf_sample_id)]["client_id"].iloc[0]
         comparison.append({
             "hypothesis": clip.gen_de_text,
             "reference": ref.text,
             "dialect": clip.dialect,
             "sample_id": clip.orig_text_id,
-            "snf_sample_id": ref.snf_sample_id
+            "snf_sample_id": ref.snf_sample_id,
+            "speaker_id": speaker_id,
         })
     df = pd.DataFrame(comparison)
     result = calculate_scores(df)

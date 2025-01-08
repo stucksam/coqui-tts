@@ -29,6 +29,8 @@ LANG_MAP = {
     'ch_zh': 'Zürich',
 }
 
+LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
+
 phon_did_cls = {0: "Zürich", 1: "Innerschweiz", 2: "Wallis", 3: "Graubünden", 4: "Ostschweiz", 5: "Basel", 6: "Bern",
                 7: "Deutschland"}
 

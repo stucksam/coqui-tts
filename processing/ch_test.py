@@ -56,7 +56,7 @@ os.makedirs(GENERATED_SPEECH_PATH_LONG, exist_ok=True)
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs, language=dial_tag,
-                        file_path=f"{GENERATED_SPEECH_PATH_LONG}/{tid}_{LANG_MAP[dial_tag]}.wav")
+                        file_path=f"{GENERATED_SPEECH_PATH_LONG}/{tid}_{LANG_MAP[dial_tag]}.wav", split_sentences=False)
 
 with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE_LONG), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
