@@ -19,6 +19,12 @@ GENERATED_SPEECH_PATH_LONG = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH
 TEXT_METADATA_FILE_LONG = TEXT_METADATA_FILE.replace(".txt", "_long.txt")
 TEXT_TRANSCRIBED_FILE_LONG = TEXT_TRANSCRIBED_FILE.replace(".txt", "_long.txt")
 
+SNF_LONG_REPLACEMENT = "_snf_long"
+GENERATED_SPEECH_FOLDER_SNF_LONG = GENERATED_SPEECH_FOLDER + SNF_LONG_REPLACEMENT
+GENERATED_SPEECH_PATH_SNF_LONG = f"{OUT_PATH}/{XTTS_MODEL_TRAINED}/{GENERATED_SPEECH_FOLDER_SNF_LONG}"
+TEXT_METADATA_FILE_SNF_LONG = TEXT_METADATA_FILE.replace(".txt", f"{SNF_LONG_REPLACEMENT}.txt")
+TEXT_TRANSCRIBED_FILE_SNF_LONG = TEXT_TRANSCRIBED_FILE.replace(".txt", f"{SNF_LONG_REPLACEMENT}.txt")
+
 LANG_MAP = {
     'ch_be': 'Bern',
     'ch_bs': 'Basel',
@@ -33,6 +39,8 @@ LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 phon_did_cls = {0: "Zürich", 1: "Innerschweiz", 2: "Wallis", 3: "Graubünden", 4: "Ostschweiz", 5: "Basel", 6: "Bern",
                 7: "Deutschland"}
+
+phon_did_cls_inv = {v: k for k, v in phon_did_cls.items()}
 
 
 class XTTSDataPoint:
@@ -105,7 +113,6 @@ def setup_gpu_device() -> tuple:
 def load_transcribed_metadata(path: str) -> list[XTTSDataPoint]:
     metadata = []
     with open(path, "rt", encoding="utf-8") as f:
-        # with open("data/" + paths["transcribed"], "rt", encoding="utf-8") as f:
         for line in f:
             split_line = line.replace('\n', '').split('\t')
             metadata.append(XTTSDataPoint.load_single_datapoint(split_line))
@@ -115,7 +122,6 @@ def load_transcribed_metadata(path: str) -> list[XTTSDataPoint]:
 def load_reference_sentences(path: str) -> list[ReferenceDatapoint]:
     references = []
     with open(path, "rt", encoding="utf-8") as f:
-        # with open("data/" + paths["text"], "rt", encoding="utf-8") as f:
         for line in f:
             split_line = line.replace('\n', '').split('\t')
             references.append(ReferenceDatapoint.load_single_ref_datapoint(split_line))

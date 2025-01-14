@@ -39,15 +39,22 @@ all_texts = list(all_texts)
 texts = random.sample(all_texts, k=100)
 
 # speaker_wavs = f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav"
+# speaker_wavs = [
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+#     # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+#     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
+# ]
 speaker_wavs = [
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
-    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
-    # f"{CLUSTER_HOME_PATH}/_speakers/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
-    # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_in/references/acf67674-c912-42c0-ba3c-f85e2db965ac/3dbf17ad654cebe79a3560a922a04ad10f1880083660d854e982e10c26e15cb2.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_in/references/acf67674-c912-42c0-ba3c-f85e2db965ac/4135a8bf6982d72002bd407843732d8aa302984fd30a02ca247da6189a4cf596.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_in/references/acf67674-c912-42c0-ba3c-f85e2db965ac/57728cc1728807a8f0e38534f045aa052292ec52983ef9ea000d984edf981660.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_in/references/acf67674-c912-42c0-ba3c-f85e2db965ac/edc6b3f75b2a0f8465220aadd50c73a438ac0b62c59f4cf3c35c35eca6a414fb.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_in/references/acf67674-c912-42c0-ba3c-f85e2db965ac/eef21c41f601ebf5669183efea0cd16d5ab07658f4b7f86b1ad798fafffbc515.wav"
 ]
 
 dial_tags = list(LANG_MAP.keys())
@@ -60,7 +67,7 @@ for tid, text in enumerate(texts):
 
 with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE_LONG), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
-        f.write(f"{idx}\t{text}\tChatGPT\n")
+        f.write(f"{idx}\t{text}\tacf67674-c912-42c0-ba3c-f85e2db965ac\n")
 
 shutil.copytree(GENERATED_SPEECH_PATH_LONG, os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED,
                                                          GENERATED_SPEECH_FOLDER_LONG), dirs_exist_ok=True)

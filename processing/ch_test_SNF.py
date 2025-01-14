@@ -26,26 +26,8 @@ df = pd.read_excel(test_meta_path, sheet_name="SNF Test Samples")
 for index, row in df.iterrows():
     all_texts.add(row["sentence"])
 
-# all_texts = [
-#     "Da kann man nicht in der Jugendherberge absteigen. Zumindest in den ersten drei Episoden überwiegt letzterer Einfluss.",
-#     "Dabei braucht einem der Winter keine Angst zu machen. Da kann man nicht in der Jugendherberge absteigen.",
-#     "Die Hinweise seien von Anwohnern und über soziale Medien eingegangen. Dabei braucht einem der Winter keine Angst zu machen.",
-#     "Diese müssen sie an grössere abgeben. Die Hinweise seien von Anwohnern und über soziale Medien eingegangen.",
-#     "Er hinterlässt eine Frau und einen Sohn. Diese müssen sie an grössere abgeben.",
-#     "Geplant sind laut Mitteilung Werkstätten mit Arbeitsplätzen für qualifizierte Handwerker. Er hinterlässt eine Frau und einen Sohn.",
-#     "Im Herbst sind im Schutz der Dunkelheit wieder vermehrt Einbrecher unterwegs. Geplant sind laut Mitteilung Werkstätten mit Arbeitsplätzen für qualifizierte Handwerker.",
-#     "Mehr Aufmerksamkeit auf den Strassenverkehr würde auch ein Head-up-Display liefern. Im Herbst sind im Schutz der Dunkelheit wieder vermehrt Einbrecher unterwegs.",
-#     'Obwohl bereits dannzumal das "Nichterreichen" der Vorgaben klar erwartet werden musste. Und auch die hohen Lebenshaltungskosten trüben das Bild von der Schweiz.',
-#     'Sie zeigen die beiden Entführten vor einem grossen schwarzen Banner sitzend. Obwohl bereits dannzumal das "Nichterreichen" der Vorgaben klar erwartet werden musste.',
-#     "Trotzdem möchte die Finanzlage anhand der Kennzahlen gesamthaft würdigen. Sie zeigen die beiden Entführten vor einem grossen schwarzen Banner sitzend.",
-#     "Und auch die hohen Lebenshaltungskosten trüben das Bild von der Schweiz. Trotzdem möchte die Finanzlage anhand der Kennzahlen gesamthaft würdigen.",
-#     "Vielen Dank für das Votum des Finanzkommissionspräsidenten, François Chapuis. Und auch die hohen Lebenshaltungskosten trüben das Bild von der Schweiz.",
-#     "Wir werden dein unglaubliches Talent und deine endlose Inspiration nie vergessen. Vielen Dank für das Votum des Finanzkommissionspräsidenten, François Chapuis.",
-#     "Zumindest in den ersten drei Episoden überwiegt letzterer Einfluss. Wir werden dein unglaubliches Talent und deine endlose Inspiration nie vergessen."
-# ]
+texts = list(all_texts)
 
-# texts = list(all_texts)
-texts = all_texts
 # Init TTS
 tts = TTS(
     model_path=model_path,
@@ -77,7 +59,6 @@ os.makedirs(DID_REF_PATH, exist_ok=True)
 print(f"Starting TTS inference for model {XTTS_MODEL_TRAINED}")
 for tid, text in enumerate(texts):
     for dial_tag in dial_tags:
-        # dialect_text = text.split(". ")[0] + "."
         filtered_df = df[(df["dialect_region"] == LANG_MAP[dial_tag]) & (df["sentence"] == text)]
         tts.tts_to_file(text=text, speaker_wav=speaker_wavs[dial_tag][filtered_df['client_id'].iloc[0]],
                         language=dial_tag,
@@ -93,7 +74,7 @@ for dial_tag in dial_tags:
 
 with open(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, TEXT_METADATA_FILE), "wt", encoding="utf-8") as f:
     for idx, text in enumerate(texts):
-        # dialect_text = text.split(". ")[0] + "."
+        dialect_text = text.split(". ")[0] + "."
         text_id = df[df["sentence"] == text]["sentence_id"].iloc[0]
         f.write(f"{idx}\t{text}\t{text_id}\n")
 

@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 from datasets import Audio, Dataset
+import librosa
 
 from processing.util import LANG_MAP, load_transcribed_metadata, load_reference_sentences, TEXT_TRANSCRIBED_FILE, \
     TEXT_METADATA_FILE
@@ -53,9 +54,9 @@ def save_ref_dataset():
     dataset.save_to_disk(f"{audio_folder}/ref_dataset")
 
 
-def save_to_dataset(path, speech_folder: str = "/generated_speech"):
+def save_to_dataset(path, speech_folder: str = "generated_speech"):
     # Path to your audio files
-    audio_folder = path + speech_folder
+    audio_folder = path + "/" + speech_folder
     metadata = load_transcribed_metadata(path + "/" + TEXT_TRANSCRIBED_FILE)
     references = load_reference_sentences(path + "/" + TEXT_METADATA_FILE)
 
@@ -66,12 +67,15 @@ def save_to_dataset(path, speech_folder: str = "/generated_speech"):
     sample_id = []
     names = []
     texts = []
+    durations = []
     for file_name in os.listdir(audio_folder):
         if file_name.endswith(".wav"):  # You can filter other formats as needed
             file_split = file_name.replace(".wav", "").split("_")
             text_id = int(file_split[0])
             dialect = file_split[1]
+
             file_path = os.path.join(audio_folder, file_name)
+            duration = librosa.get_duration(path=file_path, sr=24000)
 
             paths.append(file_path)
             text_ids.append(text_id)
@@ -84,11 +88,12 @@ def save_to_dataset(path, speech_folder: str = "/generated_speech"):
 
             name = f"{dialect}_{ref.snf_sample_id}"
             names.append(name)
+            durations.append(duration)
 
     # Create a Dataset
     # important is name, should be in form of Bern_d0b2fb58b9f562292d26e82d2698ad337e5cd05a822adeaa269f05a2783f1e4d for all datasets
     data = {"audio": paths, "name": names, "text_id": text_ids, "dialect": dialects, "sample_id": sample_id,
-            "text": texts}
+            "text": texts, "duration": durations}
     dataset = Dataset.from_dict(data)
 
     # Cast the 'audio' column to the Audio feature type
@@ -98,7 +103,7 @@ def save_to_dataset(path, speech_folder: str = "/generated_speech"):
     print(dataset)
 
     # Save the dataset to disk
-    dataset.save_to_disk(f"{path}/dataset")
+    dataset.save_to_disk(f"{path}/{speech_folder}_dataset")
 
 
 def save_conditioning_to_dataset():
@@ -205,7 +210,7 @@ def save_snf_to_dataset():
 
 
 if __name__ == "__main__":
-    # save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_4")
-    save_conditioning_to_dataset()
+    save_to_dataset("generated_speech/GPT_XTTS_v2.0_Full_3_5_SNF")
+    # save_conditioning_to_dataset()
     # save_snf_to_dataset()
     # save_ref_dataset()

@@ -108,7 +108,7 @@ def _setup_german_transcription_model():
         feature_extractor=processor.feature_extractor,
         torch_dtype=torch_dtype,
         device=device,
-        generate_kwargs={"language": "german"}
+        generate_kwargs={"language": "german", "no_repeat_ngram_size": 4}
     )
 
 
@@ -322,14 +322,25 @@ def calculate_scores(comparison: pd.DataFrame):
     return pd.DataFrame(comparison)
 
 
-def analyze_sentence(paths: dict):
+def analyze_sentence(is_long: bool, paths: dict):
     meta_data = load_transcribed_metadata_from_dict(paths)
     references = load_reference_sentences_from_dict(paths)
 
     comparison = []
     for clip in meta_data:
         ref = [entry for entry in references if entry.sample_id == clip.orig_text_id][0]
-        speaker_id = df[(df["dialect_region"] == clip.dialect) & (df["sentence_id"] == ref.snf_sample_id)]["client_id"].iloc[0]
+        if is_long:
+            df = pd.read_csv("data/test_sentences.csv", sep=";")
+            filtered = df[df["Sentence"] == ref.text]
+            token_count = filtered["token_count"].iloc[0]
+            # speaker_id = clip.sample_name.split("_")[-1]
+            speaker_id = "predefined"
+        else:
+            df = pd.read_excel("data/SNF_Test_Sentences.xlsx")
+            filtered = df[(df["dialect_region"] == clip.dialect) & (df["sentence_id"] == ref.snf_sample_id)]
+            speaker_id = filtered["client_id"].iloc[0]
+            token_count = filtered["token_count"].iloc[0]
+
         comparison.append({
             "hypothesis": clip.gen_de_text,
             "reference": ref.text,
@@ -337,10 +348,11 @@ def analyze_sentence(paths: dict):
             "sample_id": clip.orig_text_id,
             "snf_sample_id": ref.snf_sample_id,
             "speaker_id": speaker_id,
+            "token_count_ref": token_count
         })
     df = pd.DataFrame(comparison)
     result = calculate_scores(df)
-    result.to_excel('sentence_result.xlsx', index=False)
+    result.to_excel("sentence_result.xlsx", index=False)
 
 
 def analyze_did(paths: dict):
@@ -378,20 +390,29 @@ def analyze_did(paths: dict):
 def analyze_predictions(is_long: bool = False):
     paths = {
         "path": GENERATED_SPEECH_PATH_LONG if is_long else GENERATED_SPEECH_PATH,
+        # "path": GENERATED_SPEECH_PATH_SNF_LONG,
         "folder": GENERATED_SPEECH_FOLDER_LONG if is_long else GENERATED_SPEECH_FOLDER,
+        # "folder": GENERATED_SPEECH_FOLDER_SNF_LONG,
         "text": TEXT_METADATA_FILE_LONG if is_long else TEXT_METADATA_FILE,
+        # "text": TEXT_METADATA_FILE_SNF_LONG,
         "transcribed": TEXT_TRANSCRIBED_FILE_LONG if is_long else TEXT_TRANSCRIBED_FILE
+        # "transcribed": TEXT_TRANSCRIBED_FILE_SNF_LONG,
     }
-    analyze_sentence(paths)
+
+    analyze_sentence(is_long, paths)
     analyze_did(paths)
 
 
 def main(analyze_for_did: bool = False, is_long: bool = False):
     paths = {
         "path": GENERATED_SPEECH_PATH_LONG if is_long else GENERATED_SPEECH_PATH,
+        # "path": GENERATED_SPEECH_PATH_SNF_LONG,
         "folder": GENERATED_SPEECH_FOLDER_LONG if is_long else GENERATED_SPEECH_FOLDER,
+        # "folder": GENERATED_SPEECH_FOLDER_SNF_LONG,
         "text": TEXT_METADATA_FILE_LONG if is_long else TEXT_METADATA_FILE,
+        # "text": TEXT_METADATA_FILE_SNF_LONG,
         "transcribed": TEXT_TRANSCRIBED_FILE_LONG if is_long else TEXT_TRANSCRIBED_FILE
+        # "transcribed": TEXT_TRANSCRIBED_FILE_SNF_LONG,
     }
     os.makedirs(paths["path"], exist_ok=True)
     copy_files_to_scratch_partition(paths)
@@ -404,8 +425,8 @@ def main(analyze_for_did: bool = False, is_long: bool = False):
         dialect_identification(paths)
 
     shutil.copy2(
-        os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths['transcribed']),
-        os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED)
+        str(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths['transcribed'])),
+        str(os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED))
     )
 
 
@@ -421,6 +442,22 @@ def add_sentence_id():
             # text_id = df[df["sentence"] == sentence]["sentence_id"].iloc[0]
             f.write(f"{idx}\t{sentence}\tChatGPT\n")
             # f.write(f"{idx}\t{sentence}\t{text_id}\n")
+
+
+# def _do_spacy_stuff():
+#     df_short = pd.read_excel("data/SNF_Test_Sentences.xlsx")
+#     df_long = pd.read_csv("data/test_sentences.csv", sep=";")
+#
+#     def calculate_tokens(text):
+#         doc = nlp(text)
+#         return len(doc)
+#
+#     df_short["token_count"] = df_short["sentence"].apply(calculate_tokens)
+#     df_long["token_count"] = df_long["Sentence"].apply(calculate_tokens)
+#
+#
+#     df_short.to_excel("data/SNF_Test_Sentences_new.xlsx", index=False)
+#     df_long.to_csv("data/test_sentences_new.csv", index=False, sep=";")
 
 
 if __name__ == "__main__":
