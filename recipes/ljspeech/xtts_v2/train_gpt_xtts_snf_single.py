@@ -45,10 +45,10 @@ DATASETS_PATH = "/raid/admin"
 # DATASETS_PATH = f"{CLUSTER_HOME_PATH}\\datasets\\dialects"
 
 # Training Parameters
-OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
+OPTIMIZER_WD_ONLY_ON_WEIGHTS = True  # for multi-gpu training please make it False
 START_WITH_EVAL = True  # if True it will star with evaluation
 BATCH_SIZE = 36  # set here the batch size
-GRAD_ACUMM_STEPS = 14  # set here the grad accumulation steps
+GRAD_ACUMM_STEPS = 28  # set here the grad accumulation steps
 # Note: we recommend that BATCH_SIZE * GRAD_ACUMM_STEPS need to be at least 252 for more efficient training. You can increase/decrease BATCH_SIZE but then set GRAD_ACUMM_STEPS accordingly.
 
 
@@ -74,13 +74,13 @@ TOKENIZER_FILE_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/voca
 XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/model.pth"
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-# CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-January-02-2025_12+48AM-29be0cb8/"
+# CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-December-24-2024_02+06PM-3e730c51"
 TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
 # TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 # TOKENIZER_FILE = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
 # XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
-# XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_58000.pth"  # model.pth file
+# XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_130000.pth"  # model.pth file
 
 XTTS_RELOAD = False
 
@@ -92,21 +92,28 @@ if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
     )
 
 # Training sentences generations
+# SPEAKER_REFERENCE = [
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
+#     # f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
+#     f"{CLUSTER_HOME_PATH}/_speakers/ch_os/f074041baa63c2eb4987e1d33aae4ba3a298b5ab7ea8ba22a40a18fac724123b.wav",
+#     f"{CLUSTER_HOME_PATH}/_speakers/ch_os/c4fab31bec5f16b1dd466a40c3873791fb27d6298030cb971c97646e0e8864a1.wav",
+#     f"{CLUSTER_HOME_PATH}/_speakers/ch_os/9f18f947d8d6292bfc712bf0e3b7af5c5e07441093b098037c94fe796865c7e7.wav"
+#     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
+# ]
 SPEAKER_REFERENCE = [
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1011.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1042.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1043.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1054.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1056.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1066.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1077.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1087.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1088.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/gülsha/b073e82c-ae02-4a2a-a1b4-f5384b8eb9a7_1173.wav"
-    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/f074041baa63c2eb4987e1d33aae4ba3a298b5ab7ea8ba22a40a18fac724123b.wav",
-    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/c4fab31bec5f16b1dd466a40c3873791fb27d6298030cb971c97646e0e8864a1.wav",
-    # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/9f18f947d8d6292bfc712bf0e3b7af5c5e07441093b098037c94fe796865c7e7.wav"
-    # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/b79e60833ac184e3ecb8a733c259290d7ce314dbe023dc354ab44aac913b39c2.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bca8641e7cae3e8bb920b8718f8d34b24511522a44aa0979290b36132cefae01.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bce2b8c3b3d3bd6ee287e41d0a4b9b41245e2529392472a6c19caf94634d3724.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/d3306008a57079726c096d04c9f4d5b92bfca2d1c684cfe5d8e5aab3938ae4d0.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/e3088b37986a04bef04d5e9bee5b10fefeb6bea34d0f05d9e608333225e13a69.wav"
 ]
 
 DATASETS_CONFIG_LIST = []
@@ -114,15 +121,13 @@ DATASETS_CONFIG_LIST = []
 
 # txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith(("ch_", "token_counted_", "more_than_6_"))]  # training de text
 txt_files = [f for f in os.listdir(DATASETS_PATH) if
-             f.endswith('.txt') and f.startswith("more_than_6_")]  # training de text
+             f.endswith('.txt') and f.startswith("more_than_6_")]
 # txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
 
 for metadata in txt_files:
     dialect_name = metadata.replace(".txt", "").replace("more_than_6_", "")
     with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
-        # if dialect_name == "Deutschland":
-        #     continue
         if len(nsamples) < 100:  # skip small dialects
             continue
         else:
@@ -191,13 +196,13 @@ def main():
         print_step=50,
         plot_step=100,
         log_model_step=1000,
-        save_step=2000,
+        save_step=2500,
         save_n_checkpoints=1,
         save_checkpoints=True,
         wandb_entity="stucksam",
         # target_loss="loss",
         print_eval=False,
-        run_eval_steps=2000,
+        run_eval_steps=5000,
         datasets=DATASETS_CONFIG_LIST,
         shuffle=True,
         # Optimizer values like tortoise, pytorch implementation with modifications to not apply WD to non-weight parameters.
@@ -250,7 +255,7 @@ def main():
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'de',
             },
-        ]
+        ],
     )
 
     logger.info("GPT Trainer Config generated...")

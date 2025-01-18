@@ -333,8 +333,8 @@ def analyze_sentence(is_long: bool, paths: dict):
             df = pd.read_csv("data/test_sentences.csv", sep=";")
             filtered = df[df["Sentence"] == ref.text]
             token_count = filtered["token_count"].iloc[0]
-            # speaker_id = clip.sample_name.split("_")[-1]
-            speaker_id = "predefined"
+            speaker_id = clip.sample_name.split("_")[-1]
+            # speaker_id = "predefined"
         else:
             df = pd.read_excel("data/SNF_Test_Sentences.xlsx")
             filtered = df[(df["dialect_region"] == clip.dialect) & (df["sentence_id"] == ref.snf_sample_id)]
