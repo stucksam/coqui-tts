@@ -53,7 +53,7 @@ CMOS_VALUES = list(range(-3, 4))
 INTELLIGIBILITY_INFO = """
 <div class='cmos_info info'>
     <p class='desc'>
-        <strong>Intelligibility</strong> evaluates how easy it is to understand the synthesized speech and ensures that the synthesized speech is clear and comprehensible with the provided sample text.
+        <strong>Intelligibility</strong> evaluates how easy it is to understand the synthesized speech and ensures that the synthesized speech is clear and comprehensible when compared to the text prompt.
     </p>
     <ul class='values'>
         <li><strong>1 (Bad): </strong> Very difficult or impossible to understand.</li>
@@ -372,7 +372,7 @@ def run_synthesis_evaluation_app(
     print(f"End Evaluation Session {session_id}")
     print(results_df)
     date_time = datetime.now()
-    results_df.to_csv(f"processing/save_short_snf_group_{group}_{date_time.year}_{date_time.month}_{date_time.day}_{date_time.hour}.csv", index=False)
+    results_df.to_csv(f"processing/save_short_snf_group_{group}_{date_time.year}_{date_time.month}_{date_time.day}_{date_time.hour}_{date_time.minute}_{date_time.second}.csv", index=False)
     # Close Gradio
     print(f"Close App...")
     demo.close()

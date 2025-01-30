@@ -371,7 +371,7 @@ def run_synthesis_evaluation_app(
     print(results_df)
     date_time = datetime.now()
     results_df.to_csv(
-        f"processing/save_long_group_{group}_{date_time.year}_{date_time.month}_{date_time.day}_{date_time.hour}.csv",
+        f"processing/save_long_group_{group}_{date_time.year}_{date_time.month}_{date_time.day}_{date_time.hour}_{date_time.minute}_{date_time.second}.csv",
         index=False)
     # Close Gradio
     print(f"Close App...")
@@ -433,8 +433,6 @@ if __name__ == "__main__":
     reference_df = pd.concat([snf_refs, gpt_refs], ignore_index=True)
     reference_df = reference_df.drop_duplicates()
     valid_pairs_ref = set(zip(reference_df["speaker_id"], reference_df["text"]))
-    for ref in reference:
-        print(f"{ref['speaker_id']}\t{ref['text']}")
     dataset_ref = reference.filter(lambda x: (x["speaker_id"], x["text"]) in valid_pairs_ref)
 
 
@@ -442,7 +440,7 @@ if __name__ == "__main__":
         gen_datasets=datasets,
         dataset_labels=["SNF_long_coqui_srf", "SNF_long_coqui_srf_finetuned", "SNF_long_coqui_base", "GPT_long_coqui_srf", "GPT_long_coqui_srf_finetuned", "GPT_long_coqui_base"],
         # dataset_labels=["SNF_long_coqui_srf_finetuned", "SNF_long_coqui_base", "GPT_long_coqui_srf_finetuned", "GPT_long_coqui_base"],
-        ref_dataset=load_from_disk("speakers/ref_dataset"),
+        ref_dataset=dataset_ref,
         group=args.group,
         share=args.share,
         debug=True,

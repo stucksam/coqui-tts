@@ -108,6 +108,13 @@ SPEAKER_REFERENCE = [
     # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/9f18f947d8d6292bfc712bf0e3b7af5c5e07441093b098037c94fe796865c7e7.wav"
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
+SPEAKER_REFERENCE = [
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/b79e60833ac184e3ecb8a733c259290d7ce314dbe023dc354ab44aac913b39c2.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bca8641e7cae3e8bb920b8718f8d34b24511522a44aa0979290b36132cefae01.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bce2b8c3b3d3bd6ee287e41d0a4b9b41245e2529392472a6c19caf94634d3724.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/d3306008a57079726c096d04c9f4d5b92bfca2d1c684cfe5d8e5aab3938ae4d0.wav",
+    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/e3088b37986a04bef04d5e9bee5b10fefeb6bea34d0f05d9e608333225e13a69.wav"
+]
 
 DATASETS_CONFIG_LIST = []
 # https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
@@ -126,7 +133,7 @@ for metadata in txt_files:
         if len(nsamples) < 100:  # skip small dialects
             continue
         else:
-            print(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
+            logger.info(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
@@ -148,7 +155,7 @@ def main():
         max_conditioning_length=132300,  # 6 seconds with sr of 22050
         min_conditioning_length=66150,  # 3 secs with sr of 22050
         debug_loading_failures=False,
-        max_wav_length=330750,  # ~15 seconds = 240000/16000 -> 16k is sample rate of wavs -> we now upsample!
+        max_wav_length=330750,  # ~15 seconds = 240000/22050 -> 16k is sample rate of wavs -> we now upsample!
         max_text_length=390,
         mel_norm_file=MEL_NORM_FILE,
         dvae_checkpoint=DVAE_CHECKPOINT,
@@ -216,12 +223,12 @@ def main():
                 "language": 'ch_be',
             },
             {
-                "text": "Diese Privatperson hat sie anscheinend sogar vermietet.",
+                "text": "Diese Privatperson hat sie anscheinend sogar vermietet. Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_zh',
             },
             {
-                "text": "Das ist ein Hinweis für die zukünftige Planung.",
+                "text": "Das ist ein Hinweis für die zukünftige Planung. Diese Privatperson hat sie anscheinend sogar vermietet.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_vs',
             },
@@ -231,7 +238,7 @@ def main():
                 "language": 'ch_bs',
             },
             {
-                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen. Den Weihnachtsbaum haben die Arbeiter sorgfältig über das Wochenende aufgebaut.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_os',
             },

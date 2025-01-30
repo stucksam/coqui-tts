@@ -4,24 +4,25 @@ import shutil
 import jiwer
 import librosa
 import pandas as pd
-import seaborn as sns
 from bert_score import score as bert_score
 from joblib import load
 from matplotlib import pyplot as plt
 from nltk.translate.bleu_score import sentence_bleu
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, f1_score, classification_report
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline, Wav2Vec2Processor, Pipeline, Wav2Vec2ForCTC
 
 from util import CLUSTER_HOME_PATH, TEXT_TRANSCRIBED_FILE, TEXT_METADATA_FILE, OUT_PATH, XTTS_MODEL_TRAINED, \
     DID_REF_FOLDER, GENERATED_SPEECH_FOLDER, GENERATED_SPEECH_PATH, XTTSDataPoint, phon_did_cls, ReferenceDatapoint, \
     setup_gpu_device, GENERATED_SPEECH_PATH_LONG, GENERATED_SPEECH_FOLDER_LONG, TEXT_METADATA_FILE_LONG, \
-    TEXT_TRANSCRIBED_FILE_LONG, DID_REF_PATH, load_reference_sentences, load_transcribed_metadata
+    TEXT_TRANSCRIBED_FILE_LONG, DID_REF_PATH, load_reference_sentences, load_transcribed_metadata, \
+    phon_did_cls_inv
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 
 MODEL_PATH = f"{CLUSTER_HOME_PATH}/swiss-phonemes-tts/src/model"
 MODEL_PATH_DE_CH = f"{MODEL_PATH}/de_to_ch_large_2"
 MODEL_PATH_DID = f"{MODEL_PATH}/text_clf_3_ch_de.joblib"
+MODEL_PATH_DID_CH_ONLY = f"{MODEL_PATH}/text_clf_5_ch_only.joblib"
 MODEL_AUDIO_PHONEME = "facebook/wav2vec2-xlsr-53-espeak-cv-ft"
 MODEL_WHISPER_v3 = "openai/whisper-large-v3"
 MODEL_T5_TOKENIZER = "google/t5-v1_1-large"
@@ -229,7 +230,7 @@ def dialect_identification(paths: dict) -> None:
     metadata = load_transcribed_metadata_from_dict(paths)
     num_samples = len(metadata)
 
-    text_clf = load(MODEL_PATH_DID)
+    text_clf = load(MODEL_PATH_DID_CH_ONLY)
     text_clf['clf'].set_params(n_jobs=BATCH_SIZE)
 
     for start_idx in range(0, num_samples, BATCH_SIZE):
@@ -255,7 +256,7 @@ def dialect_identification_multiple_samples(paths: dict) -> None:
 
     num_samples = len(metadata)
 
-    text_clf = load(MODEL_PATH_DID)
+    text_clf = load(MODEL_PATH_DID_CH_ONLY)
     text_clf['clf'].set_params(n_jobs=BATCH_SIZE)
 
     for start_idx in range(0, num_samples, BATCH_SIZE):
@@ -265,8 +266,39 @@ def dialect_identification_multiple_samples(paths: dict) -> None:
             clip = metadata[i]
             text = [ref.text for ref in references if ref.sample_id == clip.orig_text_id][0]
             speaker = df[(df["dialect_region"] == clip.dialect) & (df["sentence"] == text)]["client_id"]
-            print(speaker)
             phonemes.append(phoneme_per_speaker[speaker.iloc[0]])
+
+        predicted = text_clf.predict(phonemes)
+
+        for idx, result in enumerate(predicted):
+            did = phon_did_cls[result]
+            metadata[start_idx + idx].gen_dialect = did
+
+    write_to_file(metadata, paths)
+
+
+def dialect_identification_long_multiple_samples(paths: dict) -> None:
+    metadata = load_transcribed_metadata_from_dict(paths)
+
+    phoneme_per_speaker = {}
+    for clip in metadata:
+        speaker = clip.sample_name.split("_")[-1].replace(".wav", "")
+        if speaker not in phoneme_per_speaker:
+            phoneme_per_speaker[speaker] = ""
+        phoneme_per_speaker[speaker] += f"{clip.gen_phoneme.replace(' ', '')} "
+
+    num_samples = len(metadata)
+
+    text_clf = load(MODEL_PATH_DID_CH_ONLY)
+    text_clf['clf'].set_params(n_jobs=BATCH_SIZE)
+
+    for start_idx in range(0, num_samples, BATCH_SIZE):
+        end_idx = min(start_idx + BATCH_SIZE, num_samples)
+        phonemes = []
+        for i in range(start_idx, end_idx):
+            clip = metadata[i]
+            speaker = clip.sample_name.split("_")[-1].replace(".wav", "")
+            phonemes.append(phoneme_per_speaker[speaker])
 
         predicted = text_clf.predict(phonemes)
 
@@ -359,7 +391,9 @@ def analyze_did(paths: dict):
     meta_data = load_transcribed_metadata_from_dict(paths)
 
     references = [clip.dialect for clip in meta_data]
+    reference_classes = [phon_did_cls_inv[clip.dialect] for clip in meta_data]
     hypothesis = [clip.gen_dialect for clip in meta_data]
+    hypothesis_classes = [phon_did_cls_inv[clip.gen_dialect] for clip in meta_data]
 
     # Create a DataFrame for easy manipulation
     data = pd.DataFrame({'Reference': references, 'Hypothesis': hypothesis})
@@ -368,22 +402,35 @@ def analyze_did(paths: dict):
     data['Match'] = data['Reference'] == data['Hypothesis']
     match_count = data['Match'].value_counts()
 
-    # Plot bar chart for matches and mismatches
-    plt.figure(figsize=(8, 5))
-    sns.barplot(x=match_count.index.map({True: 'Match', False: 'Mismatch'}), y=match_count.values, palette='coolwarm')
-    plt.title("Matches vs Mismatches")
-    plt.ylabel("Count")
-    plt.xlabel("Comparison Result")
-    plt.show()
+    # Compute F1 scores per dialect
+    f1_scores_per_dialect = classification_report(references, hypothesis, output_dict=True)
+    print("\nF1 scores per dialect:")
+    for dialect in set(references):
+        if dialect in f1_scores_per_dialect:
+            print(f"{dialect}: {f1_scores_per_dialect[dialect]['precision']:.4f} & "
+                  f"{f1_scores_per_dialect[dialect]['recall']:.4f} & "
+                  f"{f1_scores_per_dialect[dialect]['f1-score']:.4f}"
+                  )
+
+    f1_macro = f1_score(reference_classes, hypothesis_classes, average='macro')  # Treat all classes equally
+    f1_micro = f1_score(reference_classes, hypothesis_classes, average='micro')  # Aggregate globally
+    f1_weighted = f1_score(reference_classes, hypothesis_classes, average='weighted')  # Weight by support
+
+    print(f"Macro F1: {f1_macro}")
+    print(f"Micro F1: {f1_micro}")
+    print(f"Weighted F1: {f1_weighted}")
+    print(f"Match Count: {match_count}")
 
     # Confusion Matrix
     conf_matrix = confusion_matrix(references, hypothesis, labels=list(set(references + hypothesis)))
-    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=list(set(references + hypothesis)))
 
     # Plot confusion matrix as heatmap
     plt.figure(figsize=(10, 8))
-    disp.plot(cmap='viridis', colorbar=True)
+    ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=list(set(references + hypothesis))).plot(
+        cmap='magma', colorbar=True)
     plt.title("Confusion Matrix of Dialects")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
     plt.show()
 
 
@@ -430,6 +477,30 @@ def main(analyze_for_did: bool = False, is_long: bool = False):
     )
 
 
+def rerun_did_stuff(is_long: bool):
+    paths = {
+        "path": GENERATED_SPEECH_PATH_LONG if is_long else GENERATED_SPEECH_PATH,
+        # "path": GENERATED_SPEECH_PATH_SNF_LONG,
+        "folder": GENERATED_SPEECH_FOLDER_LONG if is_long else GENERATED_SPEECH_FOLDER,
+        # "folder": GENERATED_SPEECH_FOLDER_SNF_LONG,
+        "text": TEXT_METADATA_FILE_LONG if is_long else TEXT_METADATA_FILE,
+        # "text": TEXT_METADATA_FILE_SNF_LONG,
+        "transcribed": TEXT_TRANSCRIBED_FILE_LONG if is_long else TEXT_TRANSCRIBED_FILE
+        # "transcribed": TEXT_TRANSCRIBED_FILE_SNF_LONG,
+    }
+    os.makedirs(paths["path"], exist_ok=True)
+    copy_files_to_scratch_partition(paths)
+    if is_long:
+        dialect_identification_long_multiple_samples(paths)
+    else:
+        dialect_identification_multiple_samples(paths)
+
+    shutil.copy2(
+        str(os.path.join(OUT_PATH, XTTS_MODEL_TRAINED, paths['transcribed'])),
+        str(os.path.join(CLUSTER_HOME_PATH, GENERATED_SPEECH_FOLDER, XTTS_MODEL_TRAINED))
+    )
+
+
 def add_sentence_id():
     df = pd.read_excel("data/SNF_Test_Sentences.xlsx")
     texts = []
@@ -442,22 +513,6 @@ def add_sentence_id():
             # text_id = df[df["sentence"] == sentence]["sentence_id"].iloc[0]
             f.write(f"{idx}\t{sentence}\tChatGPT\n")
             # f.write(f"{idx}\t{sentence}\t{text_id}\n")
-
-
-# def _do_spacy_stuff():
-#     df_short = pd.read_excel("data/SNF_Test_Sentences.xlsx")
-#     df_long = pd.read_csv("data/test_sentences.csv", sep=";")
-#
-#     def calculate_tokens(text):
-#         doc = nlp(text)
-#         return len(doc)
-#
-#     df_short["token_count"] = df_short["sentence"].apply(calculate_tokens)
-#     df_long["token_count"] = df_long["Sentence"].apply(calculate_tokens)
-#
-#
-#     df_short.to_excel("data/SNF_Test_Sentences_new.xlsx", index=False)
-#     df_long.to_csv("data/test_sentences_new.csv", index=False, sep=";")
 
 
 if __name__ == "__main__":
