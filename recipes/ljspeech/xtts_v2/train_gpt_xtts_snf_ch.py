@@ -74,13 +74,13 @@ TOKENIZER_FILE_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/voca
 XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/model.pth"
 
 # XTTS transfer learning parameters: You we need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-January-10-2025_01+44PM-2ea5e850"
+CURRENT_CHECKPOINT_NAME = "GPT_XTTS_v2.0_LJSpeech_FT-January-02-2025_12+48AM-29be0cb8/"
 # TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
 # TOKENIZER_FILE = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 TOKENIZER_FILE = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/vocab.json"  # vocab.json file
 # XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
 # XTTS_CHECKPOINT = f"{CLUSTER_HOME_PATH}/coqui-tts/TTS/TTS_CH/trained/{CURRENT_CHECKPOINT_NAME}/checkpoint_65000.pth"  # model.pth file
-XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_50000.pth"  # model.pth file
+XTTS_CHECKPOINT = f"{OUT_PATH}/{CURRENT_CHECKPOINT_NAME}/checkpoint_58000.pth"  # model.pth file
 
 XTTS_RELOAD = True
 
@@ -108,32 +108,23 @@ SPEAKER_REFERENCE = [
     # f"{CLUSTER_HOME_PATH}/_speakers/ch_os/9f18f947d8d6292bfc712bf0e3b7af5c5e07441093b098037c94fe796865c7e7.wav"
     # speaker reference to be used in training test sentences -> condition with wav length in GPTArgs
 ]
-SPEAKER_REFERENCE = [
-    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/b79e60833ac184e3ecb8a733c259290d7ce314dbe023dc354ab44aac913b39c2.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bca8641e7cae3e8bb920b8718f8d34b24511522a44aa0979290b36132cefae01.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bce2b8c3b3d3bd6ee287e41d0a4b9b41245e2529392472a6c19caf94634d3724.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/d3306008a57079726c096d04c9f4d5b92bfca2d1c684cfe5d8e5aab3938ae4d0.wav",
-    f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/e3088b37986a04bef04d5e9bee5b10fefeb6bea34d0f05d9e608333225e13a69.wav"
-]
 
 DATASETS_CONFIG_LIST = []
 # https://www.kaggle.com/code/maxbr0wn/fine-tuning-xtts-v2-english
 
-# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith(("ch_", "token_counted_", "more_than_6_"))]  # training de text
-txt_files = [f for f in os.listdir(DATASETS_PATH) if
-             f.endswith('.txt') and f.startswith("more_than_6_")]  # training de text
-# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
+# txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and not f.startswith("ch_")]  # training de text
+txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt') and f.startswith("ch_")]  # training ch text
 
 for metadata in txt_files:
-    dialect_name = metadata.replace(".txt", "").replace("more_than_6_", "")
+    dialect_name = metadata.replace(".txt", "").replace("ch_", "")
+    if dialect_name == "Deutschland":
+        continue
     with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
         nsamples = metadata_file.readlines()
-        # if dialect_name == "Deutschland":
-        #     continue
         if len(nsamples) < 100:  # skip small dialects
             continue
         else:
-            logger.info(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
+            print(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
@@ -155,7 +146,7 @@ def main():
         max_conditioning_length=132300,  # 6 seconds with sr of 22050
         min_conditioning_length=66150,  # 3 secs with sr of 22050
         debug_loading_failures=False,
-        max_wav_length=330750,  # ~15 seconds = 240000/22050 -> 16k is sample rate of wavs -> we now upsample!
+        max_wav_length=330750,  # ~15 seconds = 240000/16000 -> 16k is sample rate of wavs -> we now upsample!
         max_text_length=390,
         mel_norm_file=MEL_NORM_FILE,
         dvae_checkpoint=DVAE_CHECKPOINT,
@@ -218,37 +209,37 @@ def main():
         use_h5=True,
         test_sentences=[
             {
-                "text": "Diese Privatperson hat sie anscheinend sogar vermietet.",
+                "text": "Die Privatperson het si ahschiinend sogar vermiatet.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_be',
             },
             {
-                "text": "Diese Privatperson hat sie anscheinend sogar vermietet. Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "text": "Die Privatperson hät si ahschindli sogar vermited",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_zh',
             },
             {
-                "text": "Das ist ein Hinweis für die zukünftige Planung. Diese Privatperson hat sie anscheinend sogar vermietet.",
+                "text": "Das isch en Hiwis fer die künftigi Planig.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_vs',
             },
             {
-                "text": "Das ist ein Hinweis für die zukünftige Planung.",
+                "text": "Das isch ä Hiiwiis für die künftigi Planig.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_bs',
             },
             {
-                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen. Den Weihnachtsbaum haben die Arbeiter sorgfältig über das Wochenende aufgebaut.",
+                "text": "Und meh Autos wend dSchwobe uf kein Fall baue.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_os',
             },
             {
-                "text": "Und mehr Autos wollen die Schwaben auf keinen Fall bauen.",
+                "text": "Ond meh Autos wend d Schwabe uf kei Fall boue.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_in',
             },
             {
-                "text": "Den Weihnachtsbaum haben die Arbeiter sorgfältig über das Wochenende aufgebaut.",
+                "text": "Dr Wiahnachtbaum hend d Arbet sorgfältig über ds Wuchanend uufbaut.",
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'ch_gr',
             },
@@ -257,7 +248,7 @@ def main():
                 "speaker_wav": SPEAKER_REFERENCE,
                 "language": 'de',
             },
-        ]
+        ],
     )
 
     logger.info("GPT Trainer Config generated...")
