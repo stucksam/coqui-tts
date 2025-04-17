@@ -8,7 +8,7 @@
 #SBATCH --nodelist=trinity
 #SBATCH --mem=64G
 #SBATCH --account=cai_nlp
-#SBATCH --partition=p_gpu_high_end
+#SBATCH --partition=gpu_top
 #SBATCH --output=/cluster/home/stku/log/%j_%N__run_tts_coqui_stku.out
 #SBATCH --error=/cluster/home/stku/log/%j_%N__run_tts_coqui_stku.err
 
@@ -46,15 +46,15 @@ fi
 export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
 ## Source and destination directories
-#SOURCE_DIR="/cluster/home/stku/datasets/dialects"
-#DEST_DIR="/scratch/dialects"
-#
+SOURCE_DIR="/cluster/home/stku/swiss-va-tts/audio/dialects"
+DEST_DIR="/scratch/dialects"
+mkdir $DEST_DIR
+cp $SOURCE_DIR/*_16000.hdf5 $DEST_DIR
+cp $SOURCE_DIR/*_16000.txt $DEST_DIR
 ## Optional: Print a message to indicate completion
-#echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
+echo "Folder copied from $SOURCE_DIR to $DEST_DIR"
 
-python3 TTS/TTS-CH/copy_h5_concurrently.py
-
-python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py  --gpus 0,1
+python3 -m trainer.distribute --script recipes/ljspeech/xtts_v2/train_gpt_xtts_snf.py --gpus 0,1
 
 # submit the job:
 # sbatch <path-to-submit-file>/main.submit

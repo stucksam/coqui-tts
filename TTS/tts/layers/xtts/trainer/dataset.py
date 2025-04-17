@@ -77,7 +77,7 @@ class XTTSDataset(torch.utils.data.Dataset):
             for dataset_config in config.datasets:
                 # self.h5_files[dataset_config.dataset_name] = h5py.File(os.path.join(dataset_config.path, 'audio.h5'), 'r')
                 dialect_name = dataset_config.dataset_name
-                self.h5_paths[dialect_name] = os.path.join(dataset_config.path, f"{dialect_name}.hdf5")
+                self.h5_paths[dialect_name] = os.path.join(dataset_config.path, f"{dialect_name}_{H5_SAMPLE_RATE}.hdf5")
 
         assert self.max_wav_len is not None and self.max_text_len is not None
 

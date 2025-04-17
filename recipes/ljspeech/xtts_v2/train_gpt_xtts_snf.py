@@ -140,7 +140,7 @@ for metadata in txt_files:
         if len(nsamples) < 100:  # skip small dialects
             continue
         else:
-            logger.info(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
+            print(f"loading dialect '{dialect_name}' with {len(nsamples)} samples.")
         DATASETS_CONFIG_LIST.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_dialect_speaker",  # create custom formatter with speaker name
@@ -155,7 +155,7 @@ for metadata in txt_files:
 def main():
     logging.basicConfig(filename=f"{datetime.now().strftime('%Y_%m_%d_%H_%M.log')}", level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler())
-    logger.info("Started")
+    print("Started")
 
     # init args and config
     model_args = GPTArgs(
@@ -175,14 +175,14 @@ def main():
         gpt_use_perceiver_resampler=True,
     )
 
-    logger.info("GPTArgs generated...")
+    print("GPTArgs generated...")
 
     # define audio config
     # audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
     audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000)
-    logger.info(f"Verifying Sample Rate: {audio_config.sample_rate}")
-    logger.info(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
-    logger.info(f"Verifying Output Sample Rate: {audio_config.output_sample_rate}")
+    print(f"Verifying Sample Rate: {audio_config.sample_rate}")
+    print(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
+    print(f"Verifying Output Sample Rate: {audio_config.output_sample_rate}")
     # training parameters config
     config = GPTTrainerConfig(
         output_path=OUT_PATH,
@@ -267,14 +267,14 @@ def main():
         ]
     )
 
-    logger.info("GPT Trainer Config generated...")
+    print("GPT Trainer Config generated...")
 
     config.languages += list(LANG_MAP.keys())
 
     if not XTTS_RELOAD:
         model = GPTTrainer.init_from_config(config)
 
-        logger.info("Loading new Model...")
+        print("Loading new Model...")
 
         new_toks = ['[ch_be]', '[ch_bs]', '[ch_gr]', '[ch_in]', '[ch_os]', '[ch_vs]', '[ch_zh]']
         model.xtts.tokenizer.tokenizer.add_special_tokens(
@@ -302,10 +302,10 @@ def main():
             new_text_head.bias.data[i] = old_th.bias.data[i]
 
     else:
-        logger.info("Loading existing model...")
+        print("Loading existing model...")
         model = GPTTrainer.init_from_config(config)
 
-    logger.info("Successfully loaded Model. Loading Training Samples now...")
+    print("Successfully loaded Model. Loading Training Samples now...")
 
     # load training samples
     train_samples, eval_samples = load_tts_samples(
@@ -314,7 +314,7 @@ def main():
         eval_split_max_size=config.eval_split_max_size,
         eval_split_size=config.eval_split_size,
     )
-    logger.info("Loaded tts samples.")
+    print("Loaded tts samples.")
 
     # init the trainer and 🚀
     trainer = Trainer(
@@ -332,7 +332,7 @@ def main():
         eval_samples=eval_samples,
     )
 
-    logger.info("Initialized Trainer...")
+    print("Initialized Trainer...")
 
     trainer.dashboard_logger = WandbLogger(  # pylint: disable=abstract-class-instantiated
         project=config.project_name,
@@ -344,7 +344,7 @@ def main():
         path=os.path.join(trainer.output_path, 'vocab.json')
     )
 
-    logger.info("Start fitting")
+    print("Start fitting")
     trainer.fit()
 
 
