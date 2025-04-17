@@ -14,14 +14,15 @@ LANG_MAP = {
     "de": "Deutschland"
 }
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
-DATASETS_PATH = "/cluster/home/stucksam/datasets/dialects"
+DATASETS_PATH = "/cluster/home/stku/swiss-va-tts/audio/dialects"
 DIALECT_TRAIN_PATH = "/scratch/dialects"
+SAMPLING_RATE = 16000
 
 
 def copy_dialect(dialect: str, tar_files: bool = False) -> None:
     print(f"Copying {dialect} to /scratch partition.")
-    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.hdf5"), DIALECT_TRAIN_PATH)
-    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}.txt"), DIALECT_TRAIN_PATH)
+    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}_{SAMPLING_RATE}.hdf5"), DIALECT_TRAIN_PATH)
+    shutil.copy2(os.path.join(DATASETS_PATH, f"{dialect}_{SAMPLING_RATE}.txt"), DIALECT_TRAIN_PATH)
 
     if tar_files:
         dialect_files = [
