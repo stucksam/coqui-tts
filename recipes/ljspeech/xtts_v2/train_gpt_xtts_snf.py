@@ -29,7 +29,7 @@ LANG_MAP = {
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 # Logging parameters
-RUN_NAME = "GPT_XTTS_v2.0_LJSpeech_FT"
+RUN_NAME = "GPT_XTTS_v2.0"
 PROJECT_NAME = "STT4SG_XTTS_trainer"
 DASHBOARD_LOGGER = "wandb"
 LOGGER_URI = None
@@ -44,6 +44,7 @@ os.makedirs(OUT_PATH, exist_ok=True)
 # DATASETS_PATH = "/raid/admin"  # only if locally on trinity
 DATASETS_PATH = "/scratch/dialects"
 # DATASETS_PATH = f"{CLUSTER_HOME_PATH}\\datasets\\dialects"
+os.makedirs(DATASETS_PATH, exist_ok=True)
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
