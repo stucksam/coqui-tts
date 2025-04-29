@@ -26,7 +26,7 @@ class DialectDataPoint:
         return 6
 
     @staticmethod
-    def load_single_datapoint(split_properties: list) -> DialectDataPoint:
+    def load_single_datapoint(split_properties: list):
         return DialectDataPoint(
             dataset_name=split_properties[0],
             sample_name=split_properties[1],

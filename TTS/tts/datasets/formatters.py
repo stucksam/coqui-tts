@@ -224,9 +224,7 @@ def ljspeech_custom_dialect_speaker(root_path, meta_file, **kwargs):  # pylint: 
     with open(txt_file, "r", encoding="utf-8") as ttf:
         for line in ttf:
             cols = line.split("\t")
-            # if cols[0] not in ["SwissDial", "SNF"]:
-            #     continue
-            text = cols[4]
+            text = cols[5]
             if len(text) > 390 or text in ["Musik", "Musik.", "musik", "musik.", "NO_TEXT"]:
                 continue
             wav_file = cols[1]
@@ -236,6 +234,7 @@ def ljspeech_custom_dialect_speaker(root_path, meta_file, **kwargs):  # pylint: 
             items.append({"text": text, "audio_file": wav_file, "speaker_name": speaker, "root_path": root_path})
     return items
 
+
 def ljspeech_custom_subset_h5_speaker(root_path, meta_file, **kwargs):  # pylint: disable=unused-argument
     """Normalizes the LJSpeech meta data file to TTS format
     https://keithito.com/LJ-Speech-Dataset/"""
@@ -244,10 +243,8 @@ def ljspeech_custom_subset_h5_speaker(root_path, meta_file, **kwargs):  # pylint
     with open(txt_file, "r", encoding="utf-8") as ttf:
         for line in ttf:
             cols = line.split("\t")
-            # if cols[0] not in ["SwissDial", "SNF"]:
-            #     continue
-            text = cols[4]
-            if len(text) > 390 or text in ["Musik", "Musik.", "musik", "musik.", "NO_TEXT", "NO_CH_TEXT"]:
+            text = cols[5]
+            if len(text) > 390 or text in ["Musik", "Musik.", "musik", "musik.", "NO_TEXT"]:
                 continue
             wav_file = cols[1]
             # sample name is set up as EPISODE-UUID_SPLIT-ID, we want EPISODE-UUID

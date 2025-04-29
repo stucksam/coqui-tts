@@ -33,6 +33,7 @@ LANG_MAP = {
     'ch_os': 'Ostschweiz',
     'ch_vs': 'Wallis',
     'ch_zh': 'Zürich',
+    'de': 'Deutschland',
 }
 
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
