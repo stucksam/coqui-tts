@@ -14,6 +14,8 @@ from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrai
 from TTS.utils.alt_loggers import WandbLogger
 from TTS.utils.manage import ModelManager
 
+from xtts_data_point import DialectDataPoint
+
 random.seed(18670209)
 
 logger = logging.getLogger(__name__)
@@ -111,54 +113,74 @@ def get_most_recent_model_checkpoint(folder: str) -> str | None:
         return None
 
 
-def only_on_start():
-    TOKENIZER_FILE = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
-    XTTS_CHECKPOINT = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
-    return TOKENIZER_FILE, XTTS_CHECKPOINT
+def load_model_files() -> tuple[str, str]:
+    if not XTTS_RELOAD:
+        tokenizer_file = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
+        xtts_checkpoint = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
+
+    else:
+        folder = get_most_recent_checkpoint_folder()
+        if folder is None:
+            raise RuntimeError(f"No most recent folder found in {CHECKPOINTS_OUT_PATH}, please verify")
+        model = get_most_recent_model_checkpoint(folder)
+        if model is None:
+            raise RuntimeError(f"No suitable checkpoint found in {folder}, please verify")
+
+        tokenizer_file = f"{OUT_PATH}/{folder}/vocab.json"  # vocab.json file
+        xtts_checkpoint = f"{OUT_PATH}/{folder}/{model}"  # model.pth file
+
+    return tokenizer_file, xtts_checkpoint
 
 
-def on_repeat():
-    folder = get_most_recent_checkpoint_folder()
-    if folder is None:
-        raise RuntimeError(f"No most recent folder found in {CHECKPOINTS_OUT_PATH}, please verify")
-    model = get_most_recent_model_checkpoint(folder)
-    if model is None:
-        raise RuntimeError(f"No suitable checkpoint found in {folder}, please verify")
-
-    TOKENIZER_FILE = f"{OUT_PATH}/{folder}/vocab.json"  # vocab.json file
-    XTTS_CHECKPOINT = f"{OUT_PATH}/{folder}/{model}"  # model.pth file
-    return TOKENIZER_FILE, XTTS_CHECKPOINT
-
-
-def load_subset_metadata(subset_to_load: int):
-    DATASETS_CONFIG_LIST = []
+def load_subset_metadata(subset_to_load: int) -> list:
+    config_list = []
     # Normal / All Samples
-    txt_files = [f for f in os.listdir(DATASETS_PATH) if f.endswith('.txt')]
+    meta_data_path = os.path.join(DATASETS_PATH, f"subset_{subset_to_load}.txt")
+    assert os.path.exists(meta_data_path), f"Subset {subset_to_load} was not found under {DATASETS_PATH}, please check."
 
-    for metadata in txt_files:
-        with open(os.path.join(DATASETS_PATH, metadata), "rt", encoding='utf-8') as metadata_file:
-            nsamples = metadata_file.readlines()
-            DATASETS_CONFIG_LIST.append(
-                BaseDatasetConfig(
-                    formatter="ljspeech_custom_subset_h5_speaker",  # create custom formatter with speaker name
-                    dataset_name=dialect_name,
-                    path=DATASETS_PATH,
-                    meta_file_train=metadata,
-                    language=LANG_MAP_INV[dialect_name],  # create dial_id
-                )
+    sample_list = {key: [] for key in LANG_MAP_INV}
+    with open(meta_data_path, "rt", encoding='utf-8') as meta_file:
+        for line in meta_file:
+            split_line = line.replace('\n', '').split('\t')
+            sample_point = DialectDataPoint.load_single_datapoint(split_line)
+            sample_list[sample_point.dialect].append(sample_point)
+
+    # drop empty lists should a dialect not be present
+    sample_list = {k: v for k, v in sample_list.items() if v}
+
+    # write out the dialect files
+    for dialect, samples in sample_list.items():
+        dialect_meta_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset_to_remove}.txt")
+        with open(dialect_meta_path, "wt", encoding="utf-8") as f:
+            for line in samples:
+                f.write(line.to_string())
+
+    for dialect, samples in sample_list.items():
+        config_list.append(
+            BaseDatasetConfig(
+                formatter="ljspeech_custom_subset_h5_speaker",  # create custom formatter with speaker name
+                dataset_name=dialect,
+                path=DATASETS_PATH,
+                meta_file_train=f"{dialect}_{subset_to_remove}.txt",
+                language=LANG_MAP_INV[dialect],  # create dial_id
             )
+        )
 
-    return DATASETS_CONFIG_LIST
+    return config_list
 
 
-def copy_subset_to_scratch(subset_to_copy: int):
+def copy_subset_to_scratch(subset_to_copy: int) -> None:
     shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.hdf5"), DATASETS_PATH)
     shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.txt"), DATASETS_PATH)
 
 
-def remove_previous_subset(subset_to_remove: int):
+def remove_previous_subset(subset_to_remove: int) -> None:
     os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.hdf5"))
     os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.txt"))
+    for dialect in LANG_MAP_INV.keys():
+        dialect_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset_to_remove}.txt")
+        if os.path.exists(dialect_path):
+            os.remove(dialect_path)
 
 
 def main(subset_to_train: int):
@@ -367,12 +389,17 @@ if __name__ == "__main__":
         # We just train on 0 or 1 and replace respective h5 on iteration
         logger.info("Training on iteration ")
 
+        if subset + 1 == NUMBER_OF_H5_SUBSETS:
+            next_subset = 0
+        else:
+            next_subset = subset + 1
+
         # Copy next h5 in background
-        process = Process(target=copy_subset_to_scratch, args=(subset + 1,))
+        process = Process(target=copy_subset_to_scratch, args=(next_subset,))
         process.start()
 
         # XTTS transfer learning parameters: You need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-        TOKENIZER_FILE, XTTS_CHECKPOINT = on_repeat() if XTTS_RELOAD else only_on_start()
+        TOKENIZER_FILE, XTTS_CHECKPOINT = load_model_files()
 
         # download XTTS v2.0 files if needed
         if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
@@ -387,10 +414,7 @@ if __name__ == "__main__":
 
         process.join()
 
-        if subset + 1 == NUMBER_OF_H5_SUBSETS:
-            subset = 0
-        else:
-            subset += 1
+        subset = next_subset
 
         # switch to reloading checkpoints after initial training
         if XTTS_RELOAD is False:
