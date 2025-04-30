@@ -47,7 +47,6 @@ os.makedirs(OUT_PATH, exist_ok=True)
 
 # DATASETS_PATH = "/raid/admin"  # only if locally on trinity
 DATASETS_PATH = "/scratch/subsets"
-# DATASETS_PATH = f"{CLUSTER_HOME_PATH}\\datasets\\dialects"
 os.makedirs(DATASETS_PATH, exist_ok=True)
 
 CLUSTER_PROJECTS_PATH = "/cluster/projects/"
@@ -133,16 +132,18 @@ def load_model_files() -> tuple[str, str]:
 
 
 def load_subset_metadata(subset_to_load: int) -> list:
-    config_list = []
     # Normal / All Samples
     meta_data_path = os.path.join(DATASETS_PATH, f"subset_{subset_to_load}.txt")
-    assert os.path.exists(meta_data_path), f"Subset {subset_to_load} was not found under {DATASETS_PATH}, please check."
+    assert os.path.exists(meta_data_path), (f"Subset {subset_to_load} was not found under {DATASETS_PATH}, "
+                                            f"please check.")
 
     sample_list = {key: [] for key in LANG_MAP_INV}
     with open(meta_data_path, "rt", encoding='utf-8') as meta_file:
         for line in meta_file:
             split_line = line.replace('\n', '').split('\t')
             sample_point = DialectDataPoint.load_single_datapoint(split_line)
+            if sample_point.dialect == "English":
+                continue
             sample_list[sample_point.dialect].append(sample_point)
 
     # drop empty lists should a dialect not be present
@@ -150,18 +151,21 @@ def load_subset_metadata(subset_to_load: int) -> list:
 
     # write out the dialect files
     for dialect, samples in sample_list.items():
-        dialect_meta_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset}.txt")
+        dialect_meta_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset_to_load}.txt")
         with open(dialect_meta_path, "wt", encoding="utf-8") as f:
             for line in samples:
                 f.write(line.to_string())
+        assert os.path.exists(dialect_meta_path), (f"Dialect {dialect} was not found under {DATASETS_PATH}, "
+                                                   f"please check.")
 
+    config_list = []
     for dialect, samples in sample_list.items():
         config_list.append(
             BaseDatasetConfig(
                 formatter="ljspeech_custom_subset_h5_speaker",  # create custom formatter with speaker name
-                dataset_name=dialect,
+                dataset_name=f"subset_{subset_to_load}",
                 path=DATASETS_PATH,
-                meta_file_train=f"{dialect}_{subset}.txt",
+                meta_file_train=f"{dialect}_{subset_to_load}.txt",
                 language=LANG_MAP_INV[dialect],  # create dial_id
             )
         )
@@ -170,11 +174,14 @@ def load_subset_metadata(subset_to_load: int) -> list:
 
 
 def copy_subset_to_scratch(subset_to_copy: int) -> None:
+    logger.info(f"Copying subset {subset_to_copy} to scratch")
     shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.hdf5"), DATASETS_PATH)
     shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.txt"), DATASETS_PATH)
+    logger.info(f"Successfully copied subset {subset_to_copy} to scratch")
 
 
 def remove_previous_subset(subset_to_remove: int) -> None:
+    logger.info(f"Deleting subset {subset_to_remove} to scratch")
     os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.hdf5"))
     os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.txt"))
     for dialect in LANG_MAP_INV.keys():
@@ -183,7 +190,7 @@ def remove_previous_subset(subset_to_remove: int) -> None:
             os.remove(dialect_path)
 
 
-def main(subset_to_train: int):
+def main():
     print("Started")
 
     # init args and config
@@ -229,8 +236,9 @@ def main(subset_to_train: int):
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
         num_loader_workers=2,
+        epochs=1,  # IMPORTANT for subset rotation training as we want to train one after the other for 1 epoch
         # eval_split_max_size=256,
-        eval_split_size=0.02,
+        eval_split_size=0.1,
         print_step=50,
         plot_step=100,
         log_model_step=1000,
@@ -403,16 +411,17 @@ if __name__ == "__main__":
 
         # download XTTS v2.0 files if needed
         if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
-            print(" > Downloading XTTS v2.0 files!")
+            logger.info(" > Downloading XTTS v2.0 files!")
             ModelManager._download_model_files(
                 [TOKENIZER_FILE_LINK, XTTS_CHECKPOINT_LINK], CHECKPOINTS_OUT_PATH, progress_bar=True
             )
 
         DATASETS_CONFIG_LIST = load_subset_metadata(subset)
 
-        main(subset)
+        main()
 
         process.join()
+        remove_previous_subset(subset)
 
         subset = next_subset
 
