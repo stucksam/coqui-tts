@@ -150,7 +150,7 @@ def load_subset_metadata(subset_to_load: int) -> list:
 
     # write out the dialect files
     for dialect, samples in sample_list.items():
-        dialect_meta_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset_to_remove}.txt")
+        dialect_meta_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset}.txt")
         with open(dialect_meta_path, "wt", encoding="utf-8") as f:
             for line in samples:
                 f.write(line.to_string())
@@ -161,7 +161,7 @@ def load_subset_metadata(subset_to_load: int) -> list:
                 formatter="ljspeech_custom_subset_h5_speaker",  # create custom formatter with speaker name
                 dataset_name=dialect,
                 path=DATASETS_PATH,
-                meta_file_train=f"{dialect}_{subset_to_remove}.txt",
+                meta_file_train=f"{dialect}_{subset}.txt",
                 language=LANG_MAP_INV[dialect],  # create dial_id
             )
         )
@@ -387,7 +387,7 @@ if __name__ == "__main__":
 
     while True:
         # We just train on 0 or 1 and replace respective h5 on iteration
-        logger.info("Training on iteration ")
+        logger.info(f"Training on subset: {subset}")
 
         if subset + 1 == NUMBER_OF_H5_SUBSETS:
             next_subset = 0
