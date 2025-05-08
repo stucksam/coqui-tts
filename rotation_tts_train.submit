@@ -1,0 +1,97 @@
+#!/bin/bash
+#SBATCH --time=1440
+#SBATCH --job-name=run_tts_coqui_stku
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=12
+#SBATCH --nodelist=trinity
+#SBATCH --mem=64G
+#SBATCH --account=cai_nlp
+#SBATCH --partition=gpu_top
+#SBATCH --output=/cluster/home/stku/log/%j_%N__run_rotate_coqui_stku.out
+#SBATCH --error=/cluster/home/stku/log/%j_%N__run_rotate_coqui_stku.err
+
+# %j: parses the slurm jobID into the file-name
+# %N: parses the Node name into the file-name
+
+env_name="coqui-tts"
+venv_base_dir="/raid/persistent_scratch/stku/venvs"
+venv_path="$venv_base_dir/$env_name"
+
+# create venv base dir if it does not exist
+mkdir -p /raid/persistent_scratch/stku/venvs/
+#rm -r $venv_path
+
+# Explicitly load cuda 12.2.2
+module load cuda/12.2.2
+
+# Check if the virtual environment exists
+echo "Searching ($venv_path)..."
+if [ -d "$venv_path" ]; then
+    echo "Virtual environment ($env_name) found. Activating..."
+    source "$venv_path/bin/activate"
+else
+    echo "Virtual environment ($env_name) not found. Creating..."
+    module load python/3.11.9
+    virtualenv $venv_path
+    unset PIP_TARGET
+    unset PYTHONPATH
+    source "$venv_path/bin/activate"
+
+    pip3 install -e .[all,dev,notebooks]
+    pip3 install wandb h5py openpyxl
+fi
+# see https://github.com/pytorch/pytorch/issues/111469
+export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
+
+subset=0
+NUMBER_OF_H5_SUBSETS=10 # You must define this somewhere
+XTTS_RELOAD=false
+DIR="/scratch/subsets"
+
+if [ ! -d "$DIR" ]; then
+    mkdir -p "$DIR"
+fi
+
+python3 copy_subset.py $subset
+
+
+while true; do
+    echo "Training on subset: $subset"
+    cat <<EOF > xtts_config.json
+{
+  "subset": "$subset",
+  "xtts_reload": "$XTTS_RELOAD"
+}
+EOF
+
+    # Set next subset
+    if (( subset + 1 == NUMBER_OF_H5_SUBSETS )); then
+        next_subset=0
+    else
+        next_subset=$((subset + 1))
+    fi
+
+    python3 copy_subset.py $next_subset &
+    bg_pid=$!
+
+    python3 -m trainer.distribute \
+        --script recipes/ljspeech/xtts_v2/train_gpt_xtts_rotation.py \
+        --gpus 0,1
+
+    wait $bg_pid
+
+    python3 remove_subset.py $subset
+
+    subset=$next_subset
+
+    if [ "$XTTS_RELOAD" = false ]; then
+        XTTS_RELOAD=true
+    fi
+done
+
+
+# submit the job:
+# sbatch <path-to-submit-file>/main.submit
+

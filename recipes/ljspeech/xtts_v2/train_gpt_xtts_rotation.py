@@ -1,9 +1,7 @@
+import json
 import logging
 import os
 import random
-import shutil
-from datetime import datetime
-from multiprocessing import Process
 
 from torch.nn import Embedding, Linear
 from trainer import Trainer, TrainerArgs
@@ -13,7 +11,6 @@ from TTS.tts.datasets import load_tts_samples
 from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTArgs, GPTTrainer, GPTTrainerConfig, XttsAudioConfig
 from TTS.utils.alt_loggers import WandbLogger
 from TTS.utils.manage import ModelManager
-
 from xtts_data_point import DialectDataPoint
 
 random.seed(18670209)
@@ -47,11 +44,12 @@ os.makedirs(OUT_PATH, exist_ok=True)
 
 # DATASETS_PATH = "/raid/admin"  # only if locally on trinity
 DATASETS_PATH = "/scratch/subsets"
-os.makedirs(DATASETS_PATH, exist_ok=True)
+# os.makedirs(DATASETS_PATH, exist_ok=True)
 
 CLUSTER_PROJECTS_PATH = "/cluster/projects/"
 CLUSTER_PROJECTS_TTS = os.path.join(CLUSTER_PROJECTS_PATH, "TTS-Swiss-German")
 TTS_TRAINING_SUBSETS_PATH = os.path.join(CLUSTER_PROJECTS_TTS, "audio_subsets")
+# TTS_TRAINING_SUBSETS_PATH = os.path.join(CLUSTER_PROJECTS_TTS, "test_audio_subsets")  # small subset test
 
 NUMBER_OF_H5_SUBSETS = 10
 
@@ -87,13 +85,16 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 # Training sentences generations
 SPEAKER_REFERENCE = f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bce2b8c3b3d3bd6ee287e41d0a4b9b41245e2529392472a6c19caf94634d3724.wav"
 
-XTTS_RELOAD = False
-
 
 def get_most_recent_checkpoint_folder() -> str | None:
+    """
+    Checks the OUT_PATH for the most recent model training folder. Assumes that there is only one training occurring
+    at all times.
+    """
     # List all items in the directory with full paths
-    folders = [os.path.join(CHECKPOINTS_OUT_PATH, f) for f in os.listdir(CHECKPOINTS_OUT_PATH) if
-               os.path.isdir(os.path.join(CHECKPOINTS_OUT_PATH, f))]
+    folders = [os.path.join(OUT_PATH, f) for f in os.listdir(OUT_PATH) if
+               os.path.isdir(os.path.join(OUT_PATH, f))]
+
     # Get the folder with the most recent modification time
     if folders:
         return max(folders, key=os.path.getmtime)
@@ -101,37 +102,78 @@ def get_most_recent_checkpoint_folder() -> str | None:
         return None
 
 
-def get_most_recent_model_checkpoint(folder: str) -> str | None:
+def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
+    """
+    Checks a given folder for the most recent checkpoint.
+    :param model_folder: model folder path in which the checkpoint needs to be found
+    :return: returns most recent model checkpoint
+    """
+    model_search = "checkpoint_"
+    # model_search = "best_model.pth"  # test for small subets
+
     # List all items in the directory with full paths
-    folders = [os.path.join(folder, f) for f in os.listdir(CHECKPOINTS_OUT_PATH) if
-               "checkpoint" in f and os.path.isfile(os.path.join(CHECKPOINTS_OUT_PATH, f))]
+    models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
+              model_search in f and os.path.isfile(os.path.join(model_folder, f))]
+
+    # checkpoint_files = glob.glob("model_folder/checkpoint_*.pth")
     # Get the folder with the most recent modification time
-    if folders:
-        return max(folders, key=os.path.getmtime)
+    if models:
+        return max(models, key=os.path.getmtime)
     else:
         return None
 
 
-def load_model_files() -> tuple[str, str]:
-    if not XTTS_RELOAD:
+def load_model_files(xtts_reload: bool) -> tuple[str, str]:
+    """
+    Returns model files based on if xtts model has to be reloaded (training already progressing) or the original base
+    files (new training).
+
+    :param xtts_reload: Wether or not to reload trained model
+    :return: path to tokenizer and model file
+    """
+    if xtts_reload:
+
+        print(f"Loading checkpoint as XTTS_RELOAD={xtts_reload}.")
+
+        folder = get_most_recent_checkpoint_folder()
+        if folder is None:
+            print(f"No most recent folder found in {CHECKPOINTS_OUT_PATH}, please verify")
+            raise RuntimeError(f"No most recent folder found in {CHECKPOINTS_OUT_PATH}, please verify")
+        print(f"Using folder: {folder}")
+
+        model = get_most_recent_model_checkpoint(folder)
+        if model is None:
+            print(f"No suitable checkpoint found in {folder}, please verify")
+            raise RuntimeError(f"No suitable checkpoint found in {folder}, please verify")
+        print(f"Using model: {model}")
+
+        tokenizer_file = os.path.join(folder, "vocab.json")  # vocab.json file
+        xtts_checkpoint = model
+
+    else:
+        print(f"Loading original model files instead of checkpoint as XTTS_RELOAD={xtts_reload}.")
+
         tokenizer_file = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(TOKENIZER_FILE_LINK))  # vocab.json file
         xtts_checkpoint = os.path.join(CHECKPOINTS_OUT_PATH, os.path.basename(XTTS_CHECKPOINT_LINK))  # model.pth file
 
-    else:
-        folder = get_most_recent_checkpoint_folder()
-        if folder is None:
-            raise RuntimeError(f"No most recent folder found in {CHECKPOINTS_OUT_PATH}, please verify")
-        model = get_most_recent_model_checkpoint(folder)
-        if model is None:
-            raise RuntimeError(f"No suitable checkpoint found in {folder}, please verify")
-
-        tokenizer_file = f"{OUT_PATH}/{folder}/vocab.json"  # vocab.json file
-        xtts_checkpoint = f"{OUT_PATH}/{folder}/{model}"  # model.pth file
+        # download XTTS v2.0 files if needed
+        if not os.path.isfile(tokenizer_file) or not os.path.isfile(xtts_checkpoint):
+            logger.info(" > Downloading XTTS v2.0 files!")
+            ModelManager._download_model_files(
+                [TOKENIZER_FILE_LINK, XTTS_CHECKPOINT_LINK], CHECKPOINTS_OUT_PATH, progress_bar=True
+            )
 
     return tokenizer_file, xtts_checkpoint
 
 
 def load_subset_metadata(subset_to_load: int) -> list:
+    """
+    Loads central subset metadata file, moves the samples into dialect specific metadata files for training and
+    returns the Dataset loader instance.
+
+    :param subset_to_load: Subset number that needs to be loaded
+    :return: list of dataset instances for each of the dialects in the subset
+    """
     # Normal / All Samples
     meta_data_path = os.path.join(DATASETS_PATH, f"subset_{subset_to_load}.txt")
     assert os.path.exists(meta_data_path), (f"Subset {subset_to_load} was not found under {DATASETS_PATH}, "
@@ -173,21 +215,31 @@ def load_subset_metadata(subset_to_load: int) -> list:
     return config_list
 
 
-def copy_subset_to_scratch(subset_to_copy: int) -> None:
-    logger.info(f"Copying subset {subset_to_copy} to scratch")
-    shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.hdf5"), DATASETS_PATH)
-    shutil.copy2(os.path.join(TTS_TRAINING_SUBSETS_PATH, f"subset_{subset_to_copy}.txt"), DATASETS_PATH)
-    logger.info(f"Successfully copied subset {subset_to_copy} to scratch")
+def str_to_bool(v) -> bool:
+    """
+    Converts string to bool
+    """
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "0"):
+        return False
+    else:
+        raise RuntimeError("Boolean value expected.")
 
 
-def remove_previous_subset(subset_to_remove: int) -> None:
-    logger.info(f"Deleting subset {subset_to_remove} to scratch")
-    os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.hdf5"))
-    os.remove(os.path.join(DATASETS_PATH, f"subset_{subset_to_remove}.txt"))
-    for dialect in LANG_MAP_INV.keys():
-        dialect_path = os.path.join(DATASETS_PATH, f"{dialect}_{subset_to_remove}.txt")
-        if os.path.exists(dialect_path):
-            os.remove(dialect_path)
+with open("xtts_config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+subset = int(config["subset"])
+XTTS_RELOAD = str_to_bool(config["xtts_reload"])
+
+print(f"Training on subset: {subset}")
+
+# XTTS transfer learning parameters: You need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
+TOKENIZER_FILE, XTTS_CHECKPOINT = load_model_files(XTTS_RELOAD)
+DATASETS_CONFIG_LIST = load_subset_metadata(subset)
 
 
 def main():
@@ -211,10 +263,11 @@ def main():
         gpt_use_perceiver_resampler=True,
     )
 
+    print(f"Model: {model_args}")
+
     print("GPTArgs generated...")
 
     # define audio config
-    # audio_config = XttsAudioConfig(sample_rate=16000, dvae_sample_rate=16000, output_sample_rate=24000)
     audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000)
     print(f"Verifying Sample Rate: {audio_config.sample_rate}")
     print(f"Verifying DVAE Sample Rate: {audio_config.dvae_sample_rate}")
@@ -382,49 +435,10 @@ def main():
     )
 
     print("Start fitting")
+    print(f"Running trainer.fit() from rank {os.environ.get('RANK')}")
     trainer.fit()
 
 
 if __name__ == "__main__":
-
-    logging.basicConfig(filename=f"{datetime.now().strftime('%Y_%m_%d_%H_%M.log')}", level=logging.INFO)
-    logging.getLogger().addHandler(logging.StreamHandler())
-
-    subset = 0
-    copy_subset_to_scratch(subset)
-
-    while True:
-        # We just train on 0 or 1 and replace respective h5 on iteration
-        logger.info(f"Training on subset: {subset}")
-
-        if subset + 1 == NUMBER_OF_H5_SUBSETS:
-            next_subset = 0
-        else:
-            next_subset = subset + 1
-
-        # Copy next h5 in background
-        process = Process(target=copy_subset_to_scratch, args=(next_subset,))
-        process.start()
-
-        # XTTS transfer learning parameters: You need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
-        TOKENIZER_FILE, XTTS_CHECKPOINT = load_model_files()
-
-        # download XTTS v2.0 files if needed
-        if not os.path.isfile(TOKENIZER_FILE) or not os.path.isfile(XTTS_CHECKPOINT):
-            logger.info(" > Downloading XTTS v2.0 files!")
-            ModelManager._download_model_files(
-                [TOKENIZER_FILE_LINK, XTTS_CHECKPOINT_LINK], CHECKPOINTS_OUT_PATH, progress_bar=True
-            )
-
-        DATASETS_CONFIG_LIST = load_subset_metadata(subset)
-
-        main()
-
-        process.join()
-        remove_previous_subset(subset)
-
-        subset = next_subset
-
-        # switch to reloading checkpoints after initial training
-        if XTTS_RELOAD is False:
-            XTTS_RELOAD = True
+    print(f"🚀 Running on rank: {os.environ.get('RANK')}")
+    main()
