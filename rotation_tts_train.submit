@@ -46,7 +46,8 @@ fi
 export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
 subset=0
-NUMBER_OF_H5_SUBSETS=10 # You must define this somewhere
+NUMBER_OF_H5_SUBSETS=8 # You must define this somewhere
+WANDB_LOGGER_ID=18670209 # You must define this somewhere
 XTTS_RELOAD=false
 DIR="/scratch/subsets"
 
@@ -62,7 +63,9 @@ while true; do
     cat <<EOF > xtts_config.json
 {
   "subset": "$subset",
-  "xtts_reload": "$XTTS_RELOAD"
+  "xtts_reload": "$XTTS_RELOAD",
+  "total_num_subsets": "$NUMBER_OF_H5_SUBSETS",
+  "wandb_id": "$WANDB_LOGGER_ID"
 }
 EOF
 

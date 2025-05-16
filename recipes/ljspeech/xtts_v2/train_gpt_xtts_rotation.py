@@ -51,7 +51,6 @@ CLUSTER_PROJECTS_TTS = os.path.join(CLUSTER_PROJECTS_PATH, "TTS-Swiss-German")
 TTS_TRAINING_SUBSETS_PATH = os.path.join(CLUSTER_PROJECTS_TTS, "audio_subsets")
 # TTS_TRAINING_SUBSETS_PATH = os.path.join(CLUSTER_PROJECTS_TTS, "test_audio_subsets")  # small subset test
 
-NUMBER_OF_H5_SUBSETS = 10
 
 # Training Parameters
 OPTIMIZER_WD_ONLY_ON_WEIGHTS = False  # for multi-gpu training please make it False
@@ -108,17 +107,23 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
     :param model_folder: model folder path in which the checkpoint needs to be found
     :return: returns most recent model checkpoint
     """
-    model_search = "checkpoint_"
-    # model_search = "best_model.pth"  # test for small subets
+    checkpoint_model_search = "checkpoint_"
+    best_model_search = "best_model_"
 
     # List all items in the directory with full paths
-    models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
-              model_search in f and os.path.isfile(os.path.join(model_folder, f))]
+    checkpoint_models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
+                         checkpoint_model_search in f and os.path.isfile(os.path.join(model_folder, f))]
 
+    best_models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
+                   best_model_search in f and os.path.isfile(os.path.join(model_folder, f))]
     # checkpoint_files = glob.glob("model_folder/checkpoint_*.pth")
     # Get the folder with the most recent modification time
-    if models:
-        return max(models, key=os.path.getmtime)
+    if best_models:
+        print("Using best model as it is the last saved checkpoint.")
+        return max(best_models, key=os.path.getmtime)
+    elif checkpoint_models:
+        print("Using checkpoitn .")
+        return max(checkpoint_models, key=os.path.getmtime)
     else:
         return None
 
@@ -230,10 +235,11 @@ def str_to_bool(v) -> bool:
 
 
 with open("xtts_config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
+    xtts_config = json.load(f)
 
-subset = int(config["subset"])
-XTTS_RELOAD = str_to_bool(config["xtts_reload"])
+subset = int(xtts_config["subset"])
+XTTS_RELOAD = str_to_bool(xtts_config["xtts_reload"])
+wandb_id = int(xtts_config["wandb_id"])
 
 print(f"Training on subset: {subset}")
 
@@ -289,7 +295,7 @@ def main():
         batch_group_size=48,
         eval_batch_size=BATCH_SIZE,
         num_loader_workers=2,
-        epochs=1,  # IMPORTANT for subset rotation training as we want to train one after the other for 1 epoch
+        epochs=2,  # IMPORTANT for subset rotation training as we want to train one after the other for 1 epoch
         # eval_split_max_size=256,
         eval_split_size=0.1,
         print_step=50,
