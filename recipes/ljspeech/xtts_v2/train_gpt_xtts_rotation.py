@@ -297,7 +297,7 @@ def main():
         num_loader_workers=2,
         epochs=2,  # IMPORTANT for subset rotation training as we want to train one after the other for 1 epoch
         # eval_split_max_size=256,
-        eval_split_size=0.1,
+        eval_split_size=0.02,
         print_step=50,
         plot_step=100,
         log_model_step=1000,
