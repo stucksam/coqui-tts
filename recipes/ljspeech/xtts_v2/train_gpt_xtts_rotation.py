@@ -118,12 +118,21 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
                    best_model_search in f and os.path.isfile(os.path.join(model_folder, f))]
     # checkpoint_files = glob.glob("model_folder/checkpoint_*.pth")
     # Get the folder with the most recent modification time
-    if best_models:
-        print("Using best model as it is the last saved checkpoint.")
-        return max(best_models, key=os.path.getmtime)
-    elif checkpoint_models:
-        print("Using checkpoitn .")
-        return max(checkpoint_models, key=os.path.getmtime)
+    if checkpoint_models:
+        checkpoint = max(checkpoint_models, key=os.path.getmtime)
+        step_checkpoint = int(checkpoint.split(checkpoint_model_search)[-1].replace(".pth", ""))
+
+        if best_models:
+            best_model = max(best_models, key=os.path.getmtime)
+            step_best_model = int(best_model.split(checkpoint_model_search)[-1].replace(".pth", ""))
+
+            if step_checkpoint < step_best_model:
+                print(f"Using best model at step {step_best_model} as it is the last saved checkpoint.")
+                return best_model
+
+        print(f"Using checkpoint at step {step_checkpoint}")
+        return checkpoint
+
     else:
         return None
 
@@ -301,8 +310,8 @@ def main():
         print_step=50,
         plot_step=100,
         log_model_step=1000,
-        save_step=2000,
-        save_n_checkpoints=5,
+        save_step=3000,
+        save_n_checkpoints=3,
         save_checkpoints=True,
         wandb_entity="stucksam",
         # target_loss="loss",
