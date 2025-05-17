@@ -124,7 +124,7 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
 
         if best_models:
             best_model = max(best_models, key=os.path.getmtime)
-            step_best_model = int(best_model.split(checkpoint_model_search)[-1].replace(".pth", ""))
+            step_best_model = int(best_model.split(best_model_search)[-1].replace(".pth", ""))
 
             if step_checkpoint < step_best_model:
                 print(f"Using best model at step {step_best_model} as it is the last saved checkpoint.")
