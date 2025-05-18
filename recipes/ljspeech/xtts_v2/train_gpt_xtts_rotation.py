@@ -84,6 +84,14 @@ XTTS_CHECKPOINT_LINK = "https://coqui.gateway.scarf.sh/hf-coqui/XTTS-v2/main/mod
 # Training sentences generations
 SPEAKER_REFERENCE = f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d9b-4853-880c-d5f0327dd384/bce2b8c3b3d3bd6ee287e41d0a4b9b41245e2529392472a6c19caf94634d3724.wav"
 
+CHECKPOINT_MODEL_SEARCH = "checkpoint_"
+BEST_MODEL_SEARCH = "best_model_"
+
+
+def get_models_in_folder(folder: str, search_string: str) -> list:
+    return [os.path.join(folder, file) for file in os.listdir(folder) if
+            search_string in file and os.path.isfile(os.path.join(folder, file))]
+
 
 def get_most_recent_checkpoint_folder() -> str | None:
     """
@@ -94,9 +102,16 @@ def get_most_recent_checkpoint_folder() -> str | None:
     folders = [os.path.join(OUT_PATH, f) for f in os.listdir(OUT_PATH) if
                os.path.isdir(os.path.join(OUT_PATH, f))]
 
+    searchable_folders = []
+    for folder in folders:
+        checkpoint_models = get_models_in_folder(folder, CHECKPOINT_MODEL_SEARCH)
+        if len(checkpoint_models) == 0:
+            continue
+        searchable_folders.append(folder)
+
     # Get the folder with the most recent modification time
-    if folders:
-        return max(folders, key=os.path.getmtime)
+    if searchable_folders:
+        return max(searchable_folders, key=os.path.getmtime)
     else:
         return None
 
@@ -107,24 +122,19 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
     :param model_folder: model folder path in which the checkpoint needs to be found
     :return: returns most recent model checkpoint
     """
-    checkpoint_model_search = "checkpoint_"
-    best_model_search = "best_model_"
-
     # List all items in the directory with full paths
-    checkpoint_models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
-                         checkpoint_model_search in f and os.path.isfile(os.path.join(model_folder, f))]
+    checkpoint_models = get_models_in_folder(model_folder, CHECKPOINT_MODEL_SEARCH)
+    best_models = get_models_in_folder(model_folder, BEST_MODEL_SEARCH)
 
-    best_models = [os.path.join(model_folder, f) for f in os.listdir(model_folder) if
-                   best_model_search in f and os.path.isfile(os.path.join(model_folder, f))]
     # checkpoint_files = glob.glob("model_folder/checkpoint_*.pth")
     # Get the folder with the most recent modification time
     if checkpoint_models:
         checkpoint = max(checkpoint_models, key=os.path.getmtime)
-        step_checkpoint = int(checkpoint.split(checkpoint_model_search)[-1].replace(".pth", ""))
+        step_checkpoint = int(checkpoint.split(CHECKPOINT_MODEL_SEARCH)[-1].replace(".pth", ""))
 
         if best_models:
             best_model = max(best_models, key=os.path.getmtime)
-            step_best_model = int(best_model.split(best_model_search)[-1].replace(".pth", ""))
+            step_best_model = int(best_model.split(BEST_MODEL_SEARCH)[-1].replace(".pth", ""))
 
             if step_checkpoint < step_best_model:
                 print(f"Using best model at step {step_best_model} as it is the last saved checkpoint.")
