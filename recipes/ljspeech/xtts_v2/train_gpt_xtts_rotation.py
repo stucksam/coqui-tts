@@ -113,14 +113,18 @@ def get_current_model_step(current_subset: int, current_epoch: int) -> int:
         return sum(SUBSET_STEPS[i] for i in range(current_subset))
     else:
         total_steps_per_epoch = sum(v for v in SUBSET_STEPS.values())
-        current_epoch_steps = sum(SUBSET_STEPS[i] for i in range(current_subset))
-        total_steps_training = total_steps_per_epoch * (current_epoch - 1) + current_epoch_steps
+        total_steps_training = total_steps_per_epoch * (current_epoch - 1)
+        if current_subset > 0:
+            current_epoch_steps = sum(SUBSET_STEPS[i] for i in range(current_subset))
+            total_steps_training =+ current_epoch_steps
         return total_steps_training
 
 
 def set_lr_scheduler(current_model_steps: int) -> dict:
+    print(f"Current checkpoint has been trained on a total of {current_model_steps} steps.")
+
     lr_scheduler = DEFAULT_LR_SCHEDULER.copy()
-    if current_model_steps == 0:
+    if current_model_steps > 0:
         lr_scheduler["last_epoch"] = current_model_steps
 
     return lr_scheduler
@@ -152,8 +156,8 @@ def get_most_recent_checkpoint_folder() -> str | None:
 def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
     """
     Checks a given folder for the most recent checkpoint.
-    :param model_folder: model folder path in which the checkpoint needs to be found
-    :return: returns most recent model checkpoint
+    :param model_folder: Model folder path in which the checkpoint needs to be found
+    :return: returns the most recent model checkpoint
     """
     # List all items in the directory with full paths
     checkpoint_models = get_models_in_folder(model_folder, CHECKPOINT_MODEL_SEARCH)
@@ -185,7 +189,7 @@ def load_model_files(xtts_reload: bool) -> tuple[str, str]:
     Returns model files based on if xtts model has to be reloaded (training already progressing) or the original base
     files (new training).
 
-    :param xtts_reload: Wether or not to reload trained model
+    :param xtts_reload: Whether to reload a trained model
     :return: path to tokenizer and model file
     """
     if xtts_reload:
@@ -225,7 +229,7 @@ def load_model_files(xtts_reload: bool) -> tuple[str, str]:
 
 def load_subset_metadata(subset_to_load: int) -> list:
     """
-    Loads central subset metadata file, moves the samples into dialect specific metadata files for training and
+    Loads a central subset metadata file, moves the samples into dialect-specific metadata files for training and
     returns the Dataset loader instance.
 
     :param subset_to_load: Subset number that needs to be loaded
