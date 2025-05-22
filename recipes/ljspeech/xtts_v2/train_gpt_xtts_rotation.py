@@ -29,6 +29,17 @@ LANG_MAP = {
 }
 LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
+SUBSET_STEPS = {  # change this if you add to the subsets
+    0: 11227,
+    1: 11213,
+    2: 11228,
+    3: 11204,
+    4: 11226,
+    5: 11225,
+    6: 11226,
+    7: 9453,
+}
+
 # Logging parameters
 RUN_NAME = "GPT_XTTS_v2.0"
 PROJECT_NAME = "STT4SG_XTTS_trainer"
@@ -87,10 +98,32 @@ SPEAKER_REFERENCE = f"{CLUSTER_HOME_PATH}/_speakers/ch_gr/references/6516567b-0d
 CHECKPOINT_MODEL_SEARCH = "checkpoint_"
 BEST_MODEL_SEARCH = "best_model_"
 
+DEFAULT_LR_SCHEDULER = {"milestones": [50000, 150000, 300000], "gamma": 0.5, "last_epoch": -1}
+
 
 def get_models_in_folder(folder: str, search_string: str) -> list:
     return [os.path.join(folder, file) for file in os.listdir(folder) if
             search_string in file and os.path.isfile(os.path.join(folder, file))]
+
+
+def get_current_model_step(current_subset: int, current_epoch: int) -> int:
+    if current_epoch == 1 and current_epoch == 0:
+        return 0
+    elif current_epoch == 1:
+        return sum(SUBSET_STEPS[i] for i in range(current_subset))
+    else:
+        total_steps_per_epoch = sum(v for v in SUBSET_STEPS.values())
+        current_epoch_steps = sum(SUBSET_STEPS[i] for i in range(current_subset))
+        total_steps_training = total_steps_per_epoch * (current_epoch - 1) + current_epoch_steps
+        return total_steps_training
+
+
+def set_lr_scheduler(current_model_steps: int) -> dict:
+    lr_scheduler = DEFAULT_LR_SCHEDULER.copy()
+    if current_model_steps == 0:
+        lr_scheduler["last_epoch"] = current_model_steps
+
+    return lr_scheduler
 
 
 def get_most_recent_checkpoint_folder() -> str | None:
@@ -257,6 +290,7 @@ with open("xtts_config.json", "r", encoding="utf-8") as f:
     xtts_config = json.load(f)
 
 subset = int(xtts_config["subset"])
+epoch = int(xtts_config["subset"])
 XTTS_RELOAD = str_to_bool(xtts_config["xtts_reload"])
 wandb_id = int(xtts_config["wandb_id"])
 
@@ -265,6 +299,9 @@ print(f"Training on subset: {subset}")
 # XTTS transfer learning parameters: You need to provide the paths of XTTS model checkpoint that you want to do the fine tuning.
 TOKENIZER_FILE, XTTS_CHECKPOINT = load_model_files(XTTS_RELOAD)
 DATASETS_CONFIG_LIST = load_subset_metadata(subset)
+
+CURRENT_TRAINING_STEPS = get_current_model_step(subset, epoch)
+LR_SCHEDULER = set_lr_scheduler(CURRENT_TRAINING_STEPS)
 
 
 def main():
@@ -336,7 +373,7 @@ def main():
         lr=6e-05,  # learning rate, maybe change to 0.00018
         lr_scheduler="MultiStepLR",
         # it was adjusted accordly for the new step scheme
-        lr_scheduler_params={"milestones": [50000 * 18, 150000 * 18, 300000 * 18], "gamma": 0.5, "last_epoch": -1},
+        lr_scheduler_params=LR_SCHEDULER,
         use_h5=True,
         test_sentences=[
             {

@@ -20,7 +20,7 @@ venv_base_dir="/raid/persistent_scratch/stku/venvs"
 venv_path="$venv_base_dir/$env_name"
 
 # create venv base dir if it does not exist
-mkdir -p /raid/persistent_scratch/stku/venvs/
+mkdir -p $venv_base_dir
 #rm -r $venv_path
 
 # Explicitly load cuda 12.2.2
@@ -45,10 +45,12 @@ fi
 # see https://github.com/pytorch/pytorch/issues/111469
 export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
-subset=0
+subset=0 # this MUST be updated on restart
+current_epoch=2  # this MUST be updated on restart
+
 NUMBER_OF_H5_SUBSETS=8 # You must define this somewhere
 WANDB_LOGGER_ID=18670209 # You must define this somewhere
-XTTS_RELOAD=false
+XTTS_RELOAD=true
 DIR="/scratch/subsets"
 
 if [ ! -d "$DIR" ]; then
@@ -62,9 +64,10 @@ while true; do
     echo "Training on subset: $subset"
     cat <<EOF > xtts_config.json
 {
-  "subset": "$subset",
-  "xtts_reload": "$XTTS_RELOAD",
-  "total_num_subsets": "$NUMBER_OF_H5_SUBSETS",
+  "subset": $subset,
+  "epoch": $current_epoch,
+  "xtts_reload": $XTTS_RELOAD,
+  "total_num_subsets": $NUMBER_OF_H5_SUBSETS,
   "wandb_id": "$WANDB_LOGGER_ID"
 }
 EOF
@@ -72,6 +75,7 @@ EOF
     # Set next subset
     if (( subset + 1 == NUMBER_OF_H5_SUBSETS )); then
         next_subset=0
+        epoch=$((epoch + 1))
     else
         next_subset=$((subset + 1))
     fi
