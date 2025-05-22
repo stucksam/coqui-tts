@@ -107,7 +107,7 @@ def get_models_in_folder(folder: str, search_string: str) -> list:
 
 
 def get_current_model_step(current_subset: int, current_epoch: int) -> int:
-    if current_epoch == 1 and current_epoch == 0:
+    if current_subset == 0 and current_epoch == 1:
         return 0
     elif current_epoch == 1:
         return sum(SUBSET_STEPS[i] for i in range(current_subset))
@@ -126,7 +126,7 @@ def set_lr_scheduler(current_model_steps: int) -> dict:
     lr_scheduler = DEFAULT_LR_SCHEDULER.copy()
     if current_model_steps > 0:
         lr_scheduler["last_epoch"] = current_model_steps
-
+    print(f"Running training with scheduler set to {lr_scheduler}")
     return lr_scheduler
 
 
@@ -294,7 +294,7 @@ with open("xtts_config.json", "r", encoding="utf-8") as f:
     xtts_config = json.load(f)
 
 subset = int(xtts_config["subset"])
-epoch = int(xtts_config["subset"])
+epoch = int(xtts_config["epoch"])
 XTTS_RELOAD = str_to_bool(xtts_config["xtts_reload"])
 wandb_id = int(xtts_config["wandb_id"])
 
