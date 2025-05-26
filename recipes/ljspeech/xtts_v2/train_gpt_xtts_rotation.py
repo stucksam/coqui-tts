@@ -99,6 +99,7 @@ CHECKPOINT_MODEL_SEARCH = "checkpoint_"
 BEST_MODEL_SEARCH = "best_model_"
 
 DEFAULT_LR_SCHEDULER = {"milestones": [50000, 150000, 300000], "gamma": 0.5, "last_epoch": -1}
+DEFAULT_LEARNING_RATE = 6e-05
 
 
 def get_models_in_folder(folder: str, search_string: str) -> list:
@@ -116,7 +117,7 @@ def get_current_model_step(current_subset: int, current_epoch: int) -> int:
         total_steps_training = total_steps_per_epoch * (current_epoch - 1)
         if current_subset > 0:
             current_epoch_steps = sum(SUBSET_STEPS[i] for i in range(current_subset))
-            total_steps_training =+ current_epoch_steps
+            total_steps_training += current_epoch_steps
         return total_steps_training
 
 
@@ -128,6 +129,18 @@ def set_lr_scheduler(current_model_steps: int) -> dict:
         lr_scheduler["last_epoch"] = current_model_steps
     print(f"Running training with scheduler set to {lr_scheduler}")
     return lr_scheduler
+
+
+def set_learning_rate(current_model_steps: int) -> float:
+    train_learning_rate = DEFAULT_LEARNING_RATE
+    milestones = DEFAULT_LR_SCHEDULER["milestones"]
+    for milestone in milestones:
+        if current_model_steps < milestone:
+            break
+
+        train_learning_rate = train_learning_rate * DEFAULT_LR_SCHEDULER["gamma"]
+    print(f"Training with lr of {train_learning_rate}")
+    return train_learning_rate
 
 
 def get_most_recent_checkpoint_folder() -> str | None:
@@ -306,6 +319,7 @@ DATASETS_CONFIG_LIST = load_subset_metadata(subset)
 
 CURRENT_TRAINING_STEPS = get_current_model_step(subset, epoch)
 LR_SCHEDULER = set_lr_scheduler(CURRENT_TRAINING_STEPS)
+LR_RATE = set_learning_rate(CURRENT_TRAINING_STEPS)
 
 
 def main():
@@ -317,7 +331,7 @@ def main():
         min_conditioning_length=66150,  # 3 secs with sr of 22050
         debug_loading_failures=False,
         max_wav_length=330750,  # ~15 seconds = 240000/22050 -> 16k is sample rate of wavs -> we now upsample!
-        max_text_length=390,
+        max_text_length=200,
         mel_norm_file=MEL_NORM_FILE,
         dvae_checkpoint=DVAE_CHECKPOINT,
         xtts_checkpoint=XTTS_CHECKPOINT,  # checkpoint path of the model that you want to fine-tune
@@ -374,10 +388,10 @@ def main():
         optimizer="AdamW",
         optimizer_wd_only_on_weights=OPTIMIZER_WD_ONLY_ON_WEIGHTS,
         optimizer_params={"betas": [0.9, 0.96], "eps": 1e-8, "weight_decay": 1e-2},
-        lr=6e-05,  # learning rate, maybe change to 0.00018
+        lr=LR_RATE,  # learning rate, maybe change to 0.00018
         lr_scheduler="MultiStepLR",
         # it was adjusted accordly for the new step scheme
-        lr_scheduler_params=LR_SCHEDULER,
+        lr_scheduler_params=DEFAULT_LR_SCHEDULER,
         use_h5=True,
         test_sentences=[
             {
@@ -487,6 +501,11 @@ def main():
         train_samples=train_samples,
         eval_samples=eval_samples,
     )
+
+    if LR_SCHEDULER["last_epoch"] != -1:
+        for group in trainer.optimizer.param_groups:
+            if "initial_lr" not in group:
+                group["initial_lr"] = group["lr"]
 
     print("Initialized Trainer...")
 
