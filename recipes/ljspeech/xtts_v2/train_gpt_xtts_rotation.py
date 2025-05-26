@@ -154,8 +154,8 @@ def get_most_recent_checkpoint_folder() -> str | None:
 
     searchable_folders = []
     for folder in folders:
-        checkpoint_models = get_models_in_folder(folder, CHECKPOINT_MODEL_SEARCH)
-        if len(checkpoint_models) == 0:
+        best_models = get_models_in_folder(folder, BEST_MODEL_SEARCH)
+        if len(best_models) == 0: # training did not complete, and as such we ignore it
             continue
         searchable_folders.append(folder)
 
@@ -303,8 +303,8 @@ def str_to_bool(v) -> bool:
         raise RuntimeError("Boolean value expected.")
 
 
-with open("xtts_config.json", "r", encoding="utf-8") as f:
-    xtts_config = json.load(f)
+with open("xtts_config.json", "r", encoding="utf-8") as conf_file:
+    xtts_config = json.load(conf_file)
 
 subset = int(xtts_config["subset"])
 epoch = int(xtts_config["epoch"])
@@ -502,10 +502,10 @@ def main():
         eval_samples=eval_samples,
     )
 
-    if LR_SCHEDULER["last_epoch"] != -1:
-        for group in trainer.optimizer.param_groups:
-            if "initial_lr" not in group:
-                group["initial_lr"] = group["lr"]
+    # if LR_SCHEDULER["last_epoch"] != -1:
+    #     for group in trainer.optimizer.param_groups:
+    #         if "initial_lr" not in group:
+    #             group["initial_lr"] = group["lr"]
 
     print("Initialized Trainer...")
 

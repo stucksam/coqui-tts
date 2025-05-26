@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=1440
-#SBATCH --job-name=run_tts_coqui_stku
+#SBATCH --job-name=run_tts_resubmit_stku
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
@@ -9,25 +9,71 @@
 #SBATCH --mem=64G
 #SBATCH --account=cai_nlp
 #SBATCH --partition=gpu_top
-#SBATCH --output=/cluster/home/stku/log/%j_%N__run_rotate_coqui_stku.out
-#SBATCH --error=/cluster/home/stku/log/%j_%N__run_rotate_coqui_stku.err
+#SBATCH --mail-user=stku@zhaw.ch
+#SBATCH --output=/cluster/home/stku/log/%j_%N__run_re-rotation_stku.out
+#SBATCH --error=/cluster/home/stku/log/%j_%N__run_re-rotation_stku.err
+#SBATCH --signal=B:SIGUSR1@60
 
-# %j: parses the slurm jobID into the file-name
-# %N: parses the Node name into the file-name
+# ----------------------------------------------------------------------------------
+# Prepare directories
+# ----------------------------------------------------------------------------------
+HOME_DIR_PATH="/cluster/home/stku/coqui-tts"
+SUBMIT_FILE_PATH="$HOME_DIR_PATH/resubmit.submit"
+SCRATCH_DIR_PATH="/scratch/subsets/"
 
+if [ ! -d "$SCRATCH_DIR_PATH" ]; then
+    mkdir -p "$SCRATCH_DIR_PATH"
+fi
+
+# ----------------------------------------------------------------------------------
+# Stop signal handler
+# ----------------------------------------------------------------------------------
+
+# The --signal option specifies a signal to be sent to the job under certain conditions.
+# In this case, we define "--signal=B:SIGUSR1@60"
+# B: refers to the batch script itself, meaning the signal will be sent to the script running the job.
+# SIGUSR1 is a user-defined signal
+# @60 specifies the timing, indicating that the signal will be sent 60 seconds before the job's allocated time ends.
+#
+# 60 s was selected for the demo. In practice, you may want to set this to a much higher value, giving your job enough time to
+# copy relevant files back to the storage cluster before the job is killed.
+# - more to signals  here: https://manpages.ubuntu.com/manpages/kinetic/man7/signal.7.html
+# - and Slurm specifics here: https://slurm.schedmd.com/sbatch.html
+
+sig_handler_USR1()
+{
+    echo "++++++++++++++++++++++++++++++++++++++"
+    echo "STOP SIGNAL DETECTED -  `date`"
+    echo "++++++++++++++++++++++++++++++++++++++"
+    echo "Current Subset: $subset"
+    echo "Current epoch: $current_epoch"
+    echo "Restarting training..."
+
+    sleep 1
+    sbatch $SUBMIT_FILE_PATH $subset $current_epoch
+    sleep 1
+    exit 0
+}
+
+# here we link the function "sig_handler_USR1" with the USR1 signal
+# once the signal is received, the function sig_handler_USR1 will be executed
+trap 'sig_handler_USR1' USR1
+
+# ----------------------------------------------------------------------------------
+# print executing hostname and date
+# ----------------------------------------------------------------------------------
+hostname
+
+# ----------------------------------------------------------------------------------
+# create python venv
+# ----------------------------------------------------------------------------------
 env_name="coqui-tts"
 venv_base_dir="/raid/persistent_scratch/stku/venvs"
 venv_path="$venv_base_dir/$env_name"
 
-# create venv base dir if it does not exist
 mkdir -p $venv_base_dir
-#rm -r $venv_path
 
-# Explicitly load cuda 12.2.2
-module load cuda/12.2.2
-
-# Check if the virtual environment exists
-echo "Searching ($venv_path)..."
+# If venv does not yet exist, create it.
 if [ -d "$venv_path" ]; then
     echo "Virtual environment ($env_name) found. Activating..."
     source "$venv_path/bin/activate"
@@ -45,16 +91,28 @@ fi
 # see https://github.com/pytorch/pytorch/issues/111469
 export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
-subset=0 # this MUST be updated on restart
-current_epoch=2  # this MUST be updated on restart
-
+# ----------------------------------------------------------------------------------
+# Setup variables
+# ----------------------------------------------------------------------------------
 NUMBER_OF_H5_SUBSETS=8 # You must define this somewhere
 WANDB_LOGGER_ID=18670209 # You must define this somewhere
 XTTS_RELOAD=true
-DIR="/scratch/subsets"
+subset=0 # this MUST be updated on restart
+current_epoch=2 # this MUST be updated on restart
+
 
 if [ ! -d "$DIR" ]; then
     mkdir -p "$DIR"
+fi
+
+# Check if one argument was provided
+if [ $# -eq 0 ]; then
+  echo "No arguments provided."
+else
+  echo "Argument provided, start training anew from subset $1 and epoch $2"
+  sleep 1
+  subset=$1
+  current_epoch=$2
 fi
 
 # ----------------------------------------------------------------------------------
@@ -69,8 +127,8 @@ while true; do
     echo "Training on subset: $subset"
 
     # ----------------------------------------------------------------------------------
-    # save training regiment for first subset that python can load. Important as
-    # distributed learning makes passing params difficult
+    # save training regiment that python can load. Important as distributed learning
+    # makes passing params difficult
     # ----------------------------------------------------------------------------------
     cat <<EOF > xtts_config.json
 {
