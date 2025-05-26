@@ -12,7 +12,7 @@
 #SBATCH --mail-user=stku@zhaw.ch
 #SBATCH --output=/cluster/home/stku/log/%j_%N__run_re-rotation_stku.out
 #SBATCH --error=/cluster/home/stku/log/%j_%N__run_re-rotation_stku.err
-#SBATCH --signal=B:SIGUSR1@60
+#SBATCH --signal=B:SIGUSR1@20
 
 # ----------------------------------------------------------------------------------
 # Prepare directories
@@ -22,21 +22,12 @@ SUBMIT_FILE_PATH="$HOME_DIR_PATH/resubmit.submit"
 SCRATCH_DIR_PATH="/scratch/subsets/"
 
 if [ ! -d "$SCRATCH_DIR_PATH" ]; then
-    mkdir -p "$SCRATCH_DIR_PATH"
+    mkdir -p $SCRATCH_DIR_PATH
 fi
 
 # ----------------------------------------------------------------------------------
 # Stop signal handler
 # ----------------------------------------------------------------------------------
-
-# The --signal option specifies a signal to be sent to the job under certain conditions.
-# In this case, we define "--signal=B:SIGUSR1@60"
-# B: refers to the batch script itself, meaning the signal will be sent to the script running the job.
-# SIGUSR1 is a user-defined signal
-# @60 specifies the timing, indicating that the signal will be sent 60 seconds before the job's allocated time ends.
-#
-# 60 s was selected for the demo. In practice, you may want to set this to a much higher value, giving your job enough time to
-# copy relevant files back to the storage cluster before the job is killed.
 # - more to signals  here: https://manpages.ubuntu.com/manpages/kinetic/man7/signal.7.html
 # - and Slurm specifics here: https://slurm.schedmd.com/sbatch.html
 
@@ -58,11 +49,6 @@ sig_handler_USR1()
 # here we link the function "sig_handler_USR1" with the USR1 signal
 # once the signal is received, the function sig_handler_USR1 will be executed
 trap 'sig_handler_USR1' USR1
-
-# ----------------------------------------------------------------------------------
-# print executing hostname and date
-# ----------------------------------------------------------------------------------
-hostname
 
 # ----------------------------------------------------------------------------------
 # create python venv
@@ -99,11 +85,6 @@ WANDB_LOGGER_ID=18670209 # You must define this somewhere
 XTTS_RELOAD=true
 subset=0 # this MUST be updated on restart
 current_epoch=2 # this MUST be updated on restart
-
-
-if [ ! -d "$DIR" ]; then
-    mkdir -p "$DIR"
-fi
 
 # Check if one argument was provided
 if [ $# -eq 0 ]; then
