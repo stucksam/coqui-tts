@@ -172,9 +172,9 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
     :param model_folder: Model folder path in which the checkpoint needs to be found
     :return: returns the most recent model checkpoint
     """
-    def get_best_model():
-        model = max(best_models, key=os.path.getmtime)
-        steps = int(best_model.split(BEST_MODEL_SEARCH)[-1].replace(".pth", ""))
+    def get_best_model(models: list) -> tuple[str, int]:
+        model = max(models, key=os.path.getmtime)
+        steps = int(model.split(BEST_MODEL_SEARCH)[-1].replace(".pth", ""))
         return model, steps
 
     # List all items in the directory with full paths
@@ -188,7 +188,7 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
         step_checkpoint = int(checkpoint.split(CHECKPOINT_MODEL_SEARCH)[-1].replace(".pth", ""))
 
         if best_models:
-            best_model, step_best_model = get_best_model()
+            best_model, step_best_model = get_best_model(best_models)
 
             if step_checkpoint < step_best_model:
                 print(f"Using best model at step {step_best_model} as it is the last saved checkpoint.")
