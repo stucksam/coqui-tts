@@ -199,7 +199,7 @@ def get_most_recent_model_checkpoint(model_folder: str) -> str | None:
 
     else:
         if best_models: # if training was < save_checkpoint step count
-            best_model, _ = get_best_model()
+            best_model, _ = get_best_model(best_models)
             return best_model
 
         return None
