@@ -83,8 +83,8 @@ export LD_LIBRARY_PATH=$venv_path/lib64/python3.11/site-packages/nvidia/nvjitlin
 NUMBER_OF_H5_SUBSETS=8 # You must define this somewhere
 WANDB_LOGGER_ID=18670209 # You must define this somewhere
 XTTS_RELOAD=true
-subset=0 # this MUST be updated on restart
-current_epoch=2 # this MUST be updated on restart
+subset=3 # this MUST be updated on restart
+current_epoch=4 # this MUST be updated on restart
 
 # Check if one argument was provided
 if [ $# -eq 0 ]; then
@@ -143,8 +143,10 @@ EOF
     # ----------------------------------------------------------------------------------
     python3 -m trainer.distribute \
         --script recipes/ljspeech/xtts_v2/train_gpt_xtts_rotation.py \
-        --gpus 0,1
-
+        --gpus 0,1 &
+    # we need to run training in background in order to catch SIG signals
+    training_pid=$!
+    wait $training_pid
     # ----------------------------------------------------------------------------------
     # If copy job still in progress of next subset, wait. Afterwards remove previous
     # subset so that scratch is not filled and set important params
