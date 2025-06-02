@@ -1,11 +1,17 @@
 import os
 import shutil
 import tarfile
-from multiprocessing import Process
+from collections import defaultdict
+from multiprocessing import Process, set_start_method
 
 import librosa
+import numpy as np
 import pandas as pd
 import torch
+import torchaudio
+from huggingface_hub import hf_hub_download
+from joblib import load
+from sklearn.metrics.pairwise import cosine_similarity
 # import whisperx
 # from whisperx.asr import FasterWhisperPipeline
 from transformers import Wav2Vec2Processor, pipeline, Wav2Vec2ForCTC, Pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
@@ -65,8 +71,9 @@ def setup_gpu_device() -> tuple:
     return train_device, dtype
 
 
-def collect_speaker_condition_samples():
+def collect_speaker_condition_samples() -> tuple[dict, dict]:
     wavs = {}
+    speaker_to_dialect_map = {}
     for dialect in LANG_MAP.keys():
         if dialect == "de":
             continue
@@ -76,7 +83,10 @@ def collect_speaker_condition_samples():
         for speaker in refs:
             wav_files = os.listdir(os.path.join(ref_path, speaker))
             wavs[speaker] = [os.path.join(ref_path, speaker, wav) for wav in wav_files]
-    return wavs
+            if speaker not in speaker_to_dialect_map:
+                speaker_to_dialect_map[speaker] = dialect
+
+    return wavs, speaker_to_dialect_map
 
 
 def assert_checkpoint_folder_contains_model(checkpoint_dir: str) -> None:
@@ -125,7 +135,7 @@ def combine_all_speaker_metadata(generated_speech_path: str) -> str:
 
     # Save the combined CSV
     save_to_csv(combined_df, combined_csv_path)
-    return path
+    return combined_csv_path
 
 
 def combine_dialect_metadata(generated_speech_path: str) -> None:
@@ -142,7 +152,8 @@ def combine_dialect_metadata(generated_speech_path: str) -> None:
             os.remove(path)
 
 
-def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str) -> None:
+def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, device: str, speaker_wavs: dict,
+                              speaker_to_dialect: dict, texts: list) -> None:
     """
     Aimed at being run in parallel for each dialect to reduce inference time from 28h -> 3h.
     """
@@ -153,6 +164,8 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str) 
         config_path=config_path,
         progress_bar=True
     ).to(device)
+    tts.eval()
+    tts.synthesizer.output_sample_rate = 24000
 
     generated_speech_path = os.path.join(model_path, "generated_speech")
 
@@ -168,8 +181,8 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str) 
                             file_path=file_path)
 
             speaker_wav_path = os.path.join(speaker, f"{tid}_{LANG_MAP[dial_tag]}.wav")
-            entry = {"tid": tid, "text": text, "dialect": LANG_MAP[dial_tag], "speaker": speaker,
-                     "file_path": speaker_wav_path}
+            entry = {"tid": tid, "text": text, "speaker": speaker, "orig_dialect": speaker_to_dialect[speaker],
+                     "dialect": LANG_MAP[dial_tag], "file_path": speaker_wav_path}
             df_dialect.append(entry)
 
         save_to_csv(df_dialect, os.path.join(out_wav_path, f"metadata_{dial_tag}.csv"))
@@ -179,6 +192,7 @@ def run_inference(directory: str) -> None:
     folder_name = os.path.basename(os.path.normpath(directory))
     model_path = os.path.join(OUT_PATH, folder_name)
     os.makedirs(model_path, exist_ok=True)
+
     save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
     os.makedirs(model_path, exist_ok=True)
 
@@ -196,8 +210,10 @@ def run_inference(directory: str) -> None:
         out_wav_path = os.path.join(generated_speech_path, speaker)
         os.makedirs(out_wav_path, exist_ok=True)
 
+    set_start_method("spawn")  # Important due to cuda not being able to fork processes
     processes = [
-        Process(target=run_inference_for_dialect, args=(model_path, config_path, dial_tag,))
+        Process(target=run_inference_for_dialect, args=(model_path, config_path, dial_tag, device, speaker_wavs,
+                                                        speaker_to_dialect, texts,))
         for dial_tag in LANG_MAP.keys()
     ]
 
@@ -229,13 +245,22 @@ def run_inference(directory: str) -> None:
     shutil.rmtree(model_path)
 
 
-def load_wav_metadata(model_path):
-    return pd.read_csv(os.path.join(model_path, "generated_speech", "wav_files.csv"), sep=";", encoding="utf-8")
+def load_wav_metadata(model_path: str) -> pd.DataFrame:
+    return pd.read_csv(os.path.join(model_path, "generated_speech", "metadata.csv"), sep=";", encoding="utf-8")
 
 
-def run_eval(model_path: str):
+def load_transcribed_metadata(model_path: str) -> pd.DataFrame:
+    return pd.read_csv(os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"), sep=";",
+                       encoding="utf-8")
+
+
+def run_transcription(directory: str):
+    folder_name = os.path.basename(os.path.normpath(directory))
+    model_path = os.path.join(OUT_PATH, folder_name)
+    os.makedirs(model_path, exist_ok=True)
+
     transcribe_audio_to_german_and_phoneme(model_path)
-    transcribe_audio_to_german_and_phoneme(model_path)
+    classify_dialect(model_path)
 
 
 def _setup_german_transcription_model():
@@ -278,13 +303,13 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     pipe_german = _setup_german_transcription_model()
     pipe_phoneme = _setup_phoneme_model()
 
-    german_text = []
-    phoneme_text = []
-    length_audio = []
+    german_text, phoneme_text, length_audio = [], [], []
+
     for start_idx in range(0, num_samples, BATCH_SIZE):
         # Define the batch range
         end_idx = min(start_idx + BATCH_SIZE, num_samples)
         subset = df.iloc[start_idx:end_idx]
+
         # Load batch of audio data
         audio_batch = []
         for path in list(subset["file_path"]):
@@ -297,38 +322,137 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
         # Run phoneme transcription
         results_phoneme = pipe_phoneme(audio_batch, batch_size=BATCH_SIZE)
 
-        for text in results_de_text:
-            german_text.append(text["text"].strip())
-        for phonemes in results_phoneme:
-            phonemes = phonemes["text"].strip()
-            if phonemes == "":
-                phonemes = MISSING_PHONEME
-            phoneme_text.append(phonemes)
+        german_text.extend(text["text"].strip() for text in results_de_text)
+        phoneme_text.extend(
+            phoneme["text"].strip() if phoneme["text"].strip() else MISSING_PHONEME
+            for phoneme in results_phoneme
+        )
 
-    assert len(df) == len(length_audio), \
-        "Detected missmatch between generated number of audio lengths and number of samples"
+    assert len(df) == len(length_audio), "Mismatch in audio lengths"
+    assert len(df) == len(german_text), "Mismatch in German text"
+    assert len(df) == len(phoneme_text), "Mismatch in phoneme text"
+
     df["audio_length"] = length_audio
-
-    assert len(df) == len(german_text), \
-        "Detected missmatch between generated number of de texts and number of samples"
     df["de_text"] = german_text
-
-    assert len(df) == len(phoneme_text), \
-        "Detected missmatch between generated number of phoneme texts and number of samples"
     df["phoneme"] = phoneme_text
 
-    df.to_csv(os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"), sep=";", index=False,
-              encoding="utf-8")
+    save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
+    save_to_csv(df, save_path)
+
+
+def load_phoneme_for_did(df: pd.DataFrame) -> dict:
+    phonemes = defaultdict(lambda: defaultdict(str))
+    for _, line in df.iterrows():
+        speaker = line["speaker"]
+        dialect = line["dialect"]
+        phonemes[speaker][dialect] += line["phoneme"].replace(' ', '')
+    return {speaker: dict(dials) for speaker, dials in phonemes.items()}
+
+
+def classify_dialect(model_path: str) -> None:
+    df = load_transcribed_metadata(model_path)
+    df["pred_dialect"] = ""
+    phoneme_per_speaker = load_phoneme_for_did(df)
+
+    text_clf = load(MODEL_PATH_DID_CH_ONLY)
+    text_clf['clf'].set_params(n_jobs=8)
+
+    for speaker, dialects in phoneme_per_speaker.items():
+        dial_tags = list(dialects.keys())
+        phonemes = list(dialects.values())
+        predicted = text_clf.predict(phonemes)
+
+        for idx, result in enumerate(predicted):
+            did = PHON_DID_CLS[result]
+
+            # Assign prediction to all matching rows in the original df
+            mask = (df["speaker"] == speaker) & (df["dial_tag"] == dial_tags[idx])
+            df.loc[mask, "pred_dialect"] = did
+
+    save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
+    save_to_csv(df, save_path)
+
+
+def _setup_speaker_sim_model():
+    # automatically checks for cached file, optionally set `cache_dir` location
+    model_file = hf_hub_download(repo_id='Jenthe/ECAPA2', filename='ecapa2.pt', cache_dir=MODEL_PATH)
+    ecapa2 = torch.jit.load(model_file, map_location=device)
+    ecapa2.half()
+    print(type(ecapa2))  # TODO update typing
+    return ecapa2
+
+
+def calculate_conditioning_embeddings(unique_speakers: str, ecapa2) -> tuple[dict, dict]:
+    speaker_to_embedding = {}
+    speaker_to_avg_similarity = {}
+    for speaker in unique_speakers:
+        conditioning_paths = speaker_wavs[speaker]
+
+        ref_embeddings = []
+        for cp in conditioning_paths:
+            waveform, _ = torchaudio.load(cp)
+            embedding = ecapa2(waveform.to(device))
+            ref_embeddings.append(embedding.cpu().numpy())
+
+        similarity_matrix = cosine_similarity(np.array(ref_embeddings).squeeze())
+        div = len(similarity_matrix) * (len(similarity_matrix) - 1) / 2
+        avg_similarity = np.triu(similarity_matrix, k=1).sum() / div
+        speaker_to_avg_similarity[speaker] = avg_similarity
+        ref_embeddings_avg = np.vstack(ref_embeddings).squeeze().mean(axis=0)
+
+        speaker_to_embedding[speaker] = ref_embeddings_avg
+
+    return speaker_to_embedding, speaker_to_avg_similarity
+
+
+def calculate_speaker_similarity(model_path: str) -> None:
+    df = load_transcribed_metadata(model_path)
+    df["speaker_similarity"] = ""
+    unique_speakers = df["speaker"].unique()
+
+    ecapa2 = _setup_speaker_sim_model()
+
+    speaker_to_embedding, speaker_to_avg_similarity = calculate_conditioning_embeddings(unique_speakers, ecapa2=ecapa2)
+
+    output_data = []
+    for sid, speaker in enumerate(unique_speakers):
+        mask = df["speaker"] == speaker
+        speaker_df = df[mask]
+        orig_dialect = speaker_df['dialect'].iloc[0]
+
+        opath_speaker = os.path.join(model_path, "generated_speech", speaker)
+        orig_dialect_tag = LANG_MAP_INV[orig_dialect]
+        ref_embeddings_avg = speaker_to_embedding[speaker]
+
+        for idx, row in speaker_df.iterrows():
+            audio_file = os.path.join(opath_speaker, f"{row['tid']}_{row['dialect']}.wav")
+            waveform, _ = torchaudio.load(audio_file)
+            sample_embedding = ecapa2(waveform.to(device)).squeeze()
+            similarity = float(
+                torch.nn.functional.cosine_similarity(torch.tensor(ref_embeddings_avg, device=device)[None, :],
+                                                      sample_embedding))
+            rel_sim = similarity / speaker_to_avg_similarity[speaker]
+
+            output_data.append({
+                'speaker': speaker,
+                "sent_id": row["tid"],
+                'dialect': row["dialect"],
+                'sentence': row["text"],
+                "audio_file": audio_file,
+                'similarity': float(similarity),
+                'rel_sim': float(rel_sim),
+                "orig_dialect": orig_dialect_tag
+            })
+
+    output_df = pd.DataFrame(output_data)
+    save_to_csv(output_df, os.path.join(model_path, "generated_speech", "speaker_similarity.csv"))
 
 
 if __name__ == "__main__":
-    # Todo: 1. zip all samples generated by model and move to projects
-    # Todo: 2. evaluate all samples and move transcribed csv to projects as well
-
     device, torch_dtype = setup_gpu_device()
 
     texts = [f"Das ist ein Beispielsatz, welcher auf Schweizerdeutsch ausgesprochen werden soll"]
-    speaker_wavs = collect_speaker_condition_samples()
+    speaker_wavs, speaker_to_dialect = collect_speaker_condition_samples()
     list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
                            os.listdir(MODEL_CHECKPOINTS_PATH) if "SwissGPC" in model_dir]
 
@@ -336,3 +460,4 @@ if __name__ == "__main__":
         assert_checkpoint_folder_contains_model(directory)
 
     run_inference(list_of_directories[0])
+    # run_transcription(list_of_directories[0])

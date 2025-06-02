@@ -29,8 +29,9 @@ sarus pull stucksam01/tts-chde:0.0.4
 echo --------------------------------
 echo Run container
 echo --------------------------------
-sarus run --mount=type=bind,source=/cluster/home/stucksam/coqui-tts,destination=/coqui-tts \
-          --mount=type=bind,source=/cluster/home/stucksam,target=/cluster/home/stucksam \
+sarus run --mount=type=bind,source=/cluster/home/stku/coqui-tts,destination=/coqui-tts \
+          --mount=type=bind,source=/cluster/home/stku,target=/cluster/home/stku \
+          --mount=type=bind,source=/cluster/projects/TTS-Swiss-German,target=/cluster/projects/TTS-Swiss-German \
           --mount=type=bind,source=/scratch,target=/scratch \
           --workdir=/coqui-tts \
           stucksam01/tts-chde:0.0.4 \
