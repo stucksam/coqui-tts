@@ -4,16 +4,19 @@ import tarfile
 from collections import defaultdict
 from multiprocessing import Process, set_start_method
 
+import jiwer
 import librosa
 import numpy as np
 import pandas as pd
 import torch
 import torchaudio
+from bert_score import score as bert_score
 from huggingface_hub import hf_hub_download
 from joblib import load
+from matplotlib import pyplot as plt
+from nltk.translate.bleu_score import sentence_bleu
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, f1_score, classification_report
 from sklearn.metrics.pairwise import cosine_similarity
-# import whisperx
-# from whisperx.asr import FasterWhisperPipeline
 from transformers import Wav2Vec2Processor, pipeline, Wav2Vec2ForCTC, Pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
 
 from TTS.api import TTS
@@ -45,6 +48,7 @@ LANG_MAP_INV = {v: k for k, v in LANG_MAP.items()}
 
 PHON_DID_CLS = {0: "Zürich", 1: "Innerschweiz", 2: "Wallis", 3: "Graubünden", 4: "Ostschweiz", 5: "Basel", 6: "Bern",
                 7: "Deutschland"}
+PHON_DID_CLS_INV = {v: k for k, v in PHON_DID_CLS.items()}
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 
@@ -122,12 +126,12 @@ def save_to_csv(entries: list | pd.DataFrame, path: str) -> None:
 
 
 def combine_all_speaker_metadata(generated_speech_path: str) -> str:
-    combined_csv_path = os.path.join(generated_speech_path, "all_metadata.csv")
+    combined_csv_path = os.path.join(generated_speech_path, "metadata.csv")
     all_dfs = []
     for root, dirs, files in os.walk(generated_speech_path):
         if "metadata.csv" in files:
             csv_path = os.path.join(root, "metadata.csv")
-            df = pd.read_csv(csv_path)
+            df = pd.read_csv(csv_path, delimiter=";", encoding="utf-8")
             all_dfs.append(df)
 
     # Combine all DataFrames
@@ -144,7 +148,8 @@ def combine_dialect_metadata(generated_speech_path: str) -> None:
         meta_data_paths = [os.path.join(out_wav_path, file)
                            for file in os.listdir(out_wav_path)
                            if file.endswith(".csv")]
-        combined_df = pd.concat([pd.read_csv(path) for path in meta_data_paths], ignore_index=True)
+        combined_df = pd.concat([pd.read_csv(path, delimiter=";", encoding="utf-8") for path in meta_data_paths],
+                                ignore_index=True)
 
         save_to_csv(combined_df, os.path.join(out_wav_path, "metadata.csv"))
 
@@ -187,15 +192,10 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, 
 
         save_to_csv(df_dialect, os.path.join(out_wav_path, f"metadata_{dial_tag}.csv"))
 
+    print(f"Finished inference for {dial_tag} for all speakers.")
 
-def run_inference(directory: str) -> None:
-    folder_name = os.path.basename(os.path.normpath(directory))
-    model_path = os.path.join(OUT_PATH, folder_name)
-    os.makedirs(model_path, exist_ok=True)
 
-    save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
-    os.makedirs(model_path, exist_ok=True)
-
+def run_inference(model_path: str) -> None:
     config_path = os.path.join(model_path, "config.json")
     vocab_path = os.path.join(model_path, "vocab.json")
 
@@ -205,7 +205,7 @@ def run_inference(directory: str) -> None:
 
     generated_speech_path = os.path.join(model_path, "generated_speech")
 
-    # Create outdirs before strting inference to reduce potential I/O issues
+    # Create outdirs before starting inference to reduce potential I/O issues
     for speaker, wav in speaker_wavs.items():
         out_wav_path = os.path.join(generated_speech_path, speaker)
         os.makedirs(out_wav_path, exist_ok=True)
@@ -232,17 +232,14 @@ def run_inference(directory: str) -> None:
         df_texts.append({"tid": tid, "text": text})
     save_to_csv(df_texts, os.path.join(generated_speech_path, "texts.csv"))
 
-    generated_speech_zip = os.path.join(model_path, "generated_speech.zip")
+    generated_speech_zip = os.path.join(model_path, "generated_speech.tar.gz")
     with tarfile.open(generated_speech_zip, "w:gz") as tar:
         tar.add(generated_speech_path, arcname="generated_speech")
 
     print("Copying generated speech to projects folder...")
-    shutil.copytree(generated_speech_zip, save_eval_path, dirs_exist_ok=True)
+    # shutil.file(generated_speech_path, save_eval_path, dirs_exist_ok=True) # uncomment if you want the raw wavs copied
+    shutil.copyfile(generated_speech_zip, os.path.join(save_eval_path, "generated_speech.tar.gz"))
     shutil.copyfile(meta_data_path, os.path.join(save_eval_path, "metadata.csv"))
-
-    # cleanup scratch
-    print("Deleting generated speech from scratch folder...")
-    shutil.rmtree(model_path)
 
 
 def load_wav_metadata(model_path: str) -> pd.DataFrame:
@@ -254,13 +251,10 @@ def load_transcribed_metadata(model_path: str) -> pd.DataFrame:
                        encoding="utf-8")
 
 
-def run_transcription(directory: str):
-    folder_name = os.path.basename(os.path.normpath(directory))
-    model_path = os.path.join(OUT_PATH, folder_name)
-    os.makedirs(model_path, exist_ok=True)
-
-    transcribe_audio_to_german_and_phoneme(model_path)
-    classify_dialect(model_path)
+def run_transcription(model: str):
+    transcribe_audio_to_german_and_phoneme(model)
+    classify_dialect(model)
+    calculate_speaker_similarity(model)
 
 
 def _setup_german_transcription_model():
@@ -297,6 +291,7 @@ def _setup_phoneme_model() -> Pipeline:
 
 
 def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
+    print(f"Transcribing generated samples by {model_path} into German and Phoneme.")
     df = load_wav_metadata(model_path)
     num_samples = len(df)
 
@@ -313,7 +308,8 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
         # Load batch of audio data
         audio_batch = []
         for path in list(subset["file_path"]):
-            audio_data, _ = librosa.load(path, sr=None)
+            audio_path = os.path.join(model_path, "generated_speech", path)
+            audio_data, _ = librosa.load(audio_path, sr=None)
             length_audio.append(round(librosa.get_duration(y=audio_data, sr=24000), 4))
             audio_batch.append(audio_data)
 
@@ -333,11 +329,12 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     assert len(df) == len(phoneme_text), "Mismatch in phoneme text"
 
     df["audio_length"] = length_audio
-    df["de_text"] = german_text
+    df["gen_text"] = german_text
     df["phoneme"] = phoneme_text
 
     save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
     save_to_csv(df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "transcribed_metadata.csv"))
 
 
 def load_phoneme_for_did(df: pd.DataFrame) -> dict:
@@ -350,6 +347,7 @@ def load_phoneme_for_did(df: pd.DataFrame) -> dict:
 
 
 def classify_dialect(model_path: str) -> None:
+    print(f"Classifying dialect for generated samples by {model_path}.")
     df = load_transcribed_metadata(model_path)
     df["pred_dialect"] = ""
     phoneme_per_speaker = load_phoneme_for_did(df)
@@ -366,14 +364,16 @@ def classify_dialect(model_path: str) -> None:
             did = PHON_DID_CLS[result]
 
             # Assign prediction to all matching rows in the original df
-            mask = (df["speaker"] == speaker) & (df["dial_tag"] == dial_tags[idx])
+            mask = (df["speaker"] == speaker) & (df["dialect"] == dial_tags[idx])
             df.loc[mask, "pred_dialect"] = did
 
     save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
     save_to_csv(df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "transcribed_metadata.csv"))
 
 
 def _setup_speaker_sim_model():
+    print("Loading speaker sim model ecapa2...")
     # automatically checks for cached file, optionally set `cache_dir` location
     model_file = hf_hub_download(repo_id='Jenthe/ECAPA2', filename='ecapa2.pt', cache_dir=MODEL_PATH)
     ecapa2 = torch.jit.load(model_file, map_location=device)
@@ -406,26 +406,28 @@ def calculate_conditioning_embeddings(unique_speakers: str, ecapa2) -> tuple[dic
 
 
 def calculate_speaker_similarity(model_path: str) -> None:
+    print(f"Starting Speaker similarity calculation for {model_path}.")
     df = load_transcribed_metadata(model_path)
     df["speaker_similarity"] = ""
     unique_speakers = df["speaker"].unique()
 
     ecapa2 = _setup_speaker_sim_model()
 
+    print(f"Calculating speaker embeddings for conditioning samples for {model_path}.")
     speaker_to_embedding, speaker_to_avg_similarity = calculate_conditioning_embeddings(unique_speakers, ecapa2=ecapa2)
 
+    print(f"Calculating speaker embeddings for generated samples for {model_path}.")
     output_data = []
     for sid, speaker in enumerate(unique_speakers):
         mask = df["speaker"] == speaker
         speaker_df = df[mask]
-        orig_dialect = speaker_df['dialect'].iloc[0]
+        orig_dialect = speaker_df["dialect"].iloc[0]
 
         opath_speaker = os.path.join(model_path, "generated_speech", speaker)
-        orig_dialect_tag = LANG_MAP_INV[orig_dialect]
         ref_embeddings_avg = speaker_to_embedding[speaker]
 
         for idx, row in speaker_df.iterrows():
-            audio_file = os.path.join(opath_speaker, f"{row['tid']}_{row['dialect']}.wav")
+            audio_file = os.path.join(opath_speaker, row['filepath'])
             waveform, _ = torchaudio.load(audio_file)
             sample_embedding = ecapa2(waveform.to(device)).squeeze()
             similarity = float(
@@ -434,18 +436,132 @@ def calculate_speaker_similarity(model_path: str) -> None:
             rel_sim = similarity / speaker_to_avg_similarity[speaker]
 
             output_data.append({
-                'speaker': speaker,
+                "speaker": speaker,
                 "sent_id": row["tid"],
-                'dialect': row["dialect"],
-                'sentence': row["text"],
+                "dialect": row["dialect"],
+                "sentence": row["text"],
                 "audio_file": audio_file,
-                'similarity': float(similarity),
-                'rel_sim': float(rel_sim),
-                "orig_dialect": orig_dialect_tag
+                "similarity": float(similarity),
+                "rel_sim": float(rel_sim),
+                "orig_dialect": orig_dialect
             })
 
     output_df = pd.DataFrame(output_data)
-    save_to_csv(output_df, os.path.join(model_path, "generated_speech", "speaker_similarity.csv"))
+    save_path = os.path.join(model_path, "generated_speech", "speaker_similarity.csv")
+    save_to_csv(output_df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "speaker_similarity.csv"))
+
+
+def run_eval(model: str) -> None:
+    evaluate_did(model)
+    evaluate_de_text(model)
+
+
+def evaluate_did(model_path: str) -> None:
+    print(f"Starting DID evaluation for {model_path}.")
+    df = load_transcribed_metadata(model_path)
+
+    references = df["dialect"]
+    reference_classes = [PHON_DID_CLS_INV[ref] for ref in references]
+    hypothesis = df["pred_dialect"]
+    hypothesis_classes = [PHON_DID_CLS_INV[hypo] for hypo in hypothesis]
+
+    # Create a DataFrame for easy manipulation
+    data = pd.DataFrame({'Reference': references, 'Hypothesis': hypothesis})
+
+    # Count matches and mismatches
+    data['Match'] = data['Reference'] == data['Hypothesis']
+    match_count = data['Match'].value_counts()
+
+    # Compute F1 scores per dialect
+    f1_scores_per_dialect = classification_report(references, hypothesis, output_dict=True)
+    print("\nF1 scores per dialect:")
+    for dialect in set(references):
+        if dialect in f1_scores_per_dialect:
+            print(f"{dialect}: {f1_scores_per_dialect[dialect]['precision']:.4f} & "
+                  f"{f1_scores_per_dialect[dialect]['recall']:.4f} & "
+                  f"{f1_scores_per_dialect[dialect]['f1-score']:.4f}"
+                  )
+
+    f1_macro = f1_score(reference_classes, hypothesis_classes, average='macro')  # Treat all classes equally
+    f1_micro = f1_score(reference_classes, hypothesis_classes, average='micro')  # Aggregate globally
+    f1_weighted = f1_score(reference_classes, hypothesis_classes, average='weighted')  # Weight by support
+
+    print(f"Macro F1: {f1_macro}")
+    print(f"Micro F1: {f1_micro}")
+    print(f"Weighted F1: {f1_weighted}")
+    print(f"Match Count: {match_count}")
+
+    # Confusion Matrix
+    conf_matrix = confusion_matrix(references, hypothesis, labels=list(set(references + hypothesis)))
+
+    # Plot confusion matrix as heatmap
+    plt.figure(figsize=(10, 8))
+    ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=list(set(references + hypothesis))).plot(
+        cmap='magma', colorbar=True)
+    plt.title("Confusion Matrix of Dialects")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+def calculate_scores(comparison: pd.DataFrame):
+    scores = {
+        "wer": [],
+        "wer_lower": [],
+        "mer": [],
+        "mer_lower": [],
+        "wil": [],
+        "wil_lower": [],
+        "cer": [],
+        "cer_lower": [],
+        "bert_score": [],
+    }
+
+    for idx, row in comparison.iterrows():
+        ref, hypo = row["text"], row["gen_text"]
+        ref_low, hypo_low = ref.lower(), hypo.lower()
+
+        out = jiwer.process_words(ref, hypo)
+        out_low = jiwer.process_words(ref_low, hypo_low)
+
+        scores["wer"].append(out.wer)
+        scores["wer_lower"].append(out_low.wer)
+        scores["mer"].append(out.mer)
+        scores["mer_lower"].append(out_low.mer)
+        scores["wil"].append(out.wil)
+        scores["wil_lower"].append(out_low.wil)
+
+        scores["cer"].append(jiwer.process_characters(ref, hypo).cer)
+        scores["cer_lower"].append(jiwer.process_characters(ref_low, hypo_low).cer)
+
+        # BERTScore (computed per sentence)
+        _, _, F1 = bert_score([hypo], [ref], lang="de")
+        scores["bert_score"].append(F1.mean().item())
+
+    # Calculate BLEU Score
+    reference_split = [ref.split(" ") for ref in comparison["text"]]
+    hypothesis_split = [hyp.split(" ") for hyp in comparison["gen_text"]]
+    bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
+    comparison["bleu_score"] = bleu_scores
+
+    reference_split = [ref.lower().split(" ") for ref in comparison["text"]]
+    hypothesis_split = [hyp.lower().split(" ") for hyp in comparison["gen_text"]]
+    bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
+    comparison["bleu_score_lower"] = bleu_scores
+
+    return pd.DataFrame(comparison)
+
+
+def evaluate_de_text(model_path: str) -> None:
+    print(f"Starting score calculation for DE-text for {model_path}.")
+    df = load_transcribed_metadata(model_path)
+    de_text_df = df[["speaker", "orig_dialect", "dialect", "tid", "text", "gen_text"]].copy()
+    calc_de_text_df = calculate_scores(de_text_df)
+
+    save_path = os.path.join(model_path, "generated_speech", "de_text_calc.csv")
+    save_to_csv(calc_de_text_df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "de_text_calc.csv"))
 
 
 if __name__ == "__main__":
@@ -459,5 +575,17 @@ if __name__ == "__main__":
     for directory in list_of_directories:
         assert_checkpoint_folder_contains_model(directory)
 
-    run_inference(list_of_directories[0])
-    # run_transcription(list_of_directories[0])
+    dirc = list_of_directories[0]
+    folder_name = os.path.basename(os.path.normpath(dirc))
+    model_path = os.path.join(OUT_PATH, folder_name)
+    os.makedirs(model_path, exist_ok=True)
+
+    save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
+    os.makedirs(save_eval_path, exist_ok=True)
+
+    run_inference(model_path)
+    run_transcription(model_path)
+
+    # cleanup scratch
+    print("Deleting generated speech from scratch folder...")
+    shutil.rmtree(model_path)
