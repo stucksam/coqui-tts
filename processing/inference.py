@@ -26,6 +26,7 @@ CLUSTER_PROJECTS_PATH = "/cluster/projects/TTS-Swiss-German"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
 OUT_PATH = "/scratch/eval"
 SPEAKER_DIRECTORY = os.path.join(CLUSTER_HOME_PATH, "_speakers")
+COQUI_TTS_PATH = os.path.join(CLUSTER_HOME_PATH, "coqui-tts")
 MODEL_CHECKPOINTS_PATH = os.path.join(CLUSTER_PROJECTS_PATH, "checkpoints")
 
 CHECKPOINT_MODEL_SEARCH = "checkpoint_"
@@ -52,10 +53,8 @@ PHON_DID_CLS_INV = {v: k for k, v in PHON_DID_CLS.items()}
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 
-MODEL_PATH = os.path.join(CLUSTER_HOME_PATH, "swiss-vs-tts", "models")
-MODEL_PATH_DE_CH = os.path.join(MODEL_PATH, "de_to_ch_large_2")
+MODEL_PATH = os.path.join(COQUI_TTS_PATH, "processing", "models")
 MODEL_PATH_DID = os.path.join(MODEL_PATH, "text_clf_3_ch_de.joblib")
-MODEL_PATH_DID_CH_ONLY = os.path.join(MODEL_PATH, "text_clf_5_ch_only.joblib")
 
 MODEL_DOWNLOAD_PATH = os.path.join(OUT_PATH, "download")
 os.makedirs(MODEL_DOWNLOAD_PATH, exist_ok=True)
@@ -88,7 +87,7 @@ def collect_speaker_condition_samples() -> tuple[dict, dict]:
             wav_files = os.listdir(os.path.join(ref_path, speaker))
             wavs[speaker] = [os.path.join(ref_path, speaker, wav) for wav in wav_files]
             if speaker not in speaker_to_dialect_map:
-                speaker_to_dialect_map[speaker] = dialect
+                speaker_to_dialect_map[speaker] = LANG_MAP[dialect]
 
     return wavs, speaker_to_dialect_map
 
@@ -181,7 +180,7 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, 
 
         df_dialect = []
         for tid, text in enumerate(texts):
-            file_path = os.path.join(out_wav_path, f"{tid}_{LANG_MAP[dial_tag]}")
+            file_path = os.path.join(out_wav_path, f"{tid}_{LANG_MAP[dial_tag]}.wav")
             tts.tts_to_file(text=text, speaker_wav=wav, language=dial_tag, split_sentences=True,
                             file_path=file_path)
 
@@ -210,7 +209,6 @@ def run_inference(model_path: str) -> None:
         out_wav_path = os.path.join(generated_speech_path, speaker)
         os.makedirs(out_wav_path, exist_ok=True)
 
-    set_start_method("spawn")  # Important due to cuda not being able to fork processes
     processes = [
         Process(target=run_inference_for_dialect, args=(model_path, config_path, dial_tag, device, speaker_wavs,
                                                         speaker_to_dialect, texts,))
@@ -307,8 +305,9 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
 
         # Load batch of audio data
         audio_batch = []
-        for path in list(subset["file_path"]):
-            audio_path = os.path.join(model_path, "generated_speech", path)
+        for idx, row in subset.iterrows():
+            audio_path = os.path.join(model_path, "generated_speech", row["speaker"],
+                                      f"{row['tid']}_{row['dialect']}.wav")
             audio_data, _ = librosa.load(audio_path, sr=None)
             length_audio.append(round(librosa.get_duration(y=audio_data, sr=24000), 4))
             audio_batch.append(audio_data)
@@ -352,7 +351,7 @@ def classify_dialect(model_path: str) -> None:
     df["pred_dialect"] = ""
     phoneme_per_speaker = load_phoneme_for_did(df)
 
-    text_clf = load(MODEL_PATH_DID_CH_ONLY)
+    text_clf = load(MODEL_PATH_DID)
     text_clf['clf'].set_params(n_jobs=8)
 
     for speaker, dialects in phoneme_per_speaker.items():
@@ -502,6 +501,7 @@ def evaluate_did(model_path: str) -> None:
     plt.title("Confusion Matrix of Dialects")
     plt.xticks(rotation=45)
     plt.tight_layout()
+    plt.savefig(os.path.join(save_eval_path, "did_confusion_matrix.png"))
     plt.show()
 
 
@@ -583,8 +583,20 @@ if __name__ == "__main__":
     save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
     os.makedirs(save_eval_path, exist_ok=True)
 
+    try:
+        set_start_method("spawn")  # Important due to cuda not being able to fork processes
+    except RuntimeError:
+        print("Experienced issue on setting start method from fork to spawn...")
+        pass  # Start method already set (usually when re-running in interactive environments)
+
+    print("Starting inference")
     run_inference(model_path)
+
+    print("Starting transcription")
     run_transcription(model_path)
+
+    print("Starting evaluation")
+    run_eval(model_path)
 
     # cleanup scratch
     print("Deleting generated speech from scratch folder...")
