@@ -528,7 +528,7 @@ def main():
     )
 
     print("Start fitting")
-    print(f"Running trainer.fit() from rank {os.environ.get('RANK')}")
+    print(f"Running trainer.fit() from rank {os.environ.get('RANK')} with subset {subset}")
     trainer.fit()
 
 

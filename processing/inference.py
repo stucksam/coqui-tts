@@ -25,7 +25,9 @@ CLUSTER_HOME_PATH = "/cluster/home/stku"
 CLUSTER_PROJECTS_PATH = "/cluster/projects/TTS-Swiss-German"
 # CLUSTER_HOME_PATH = "/home/ubuntu/ma/"
 OUT_PATH = "/scratch/eval"
-SPEAKER_DIRECTORY = os.path.join(CLUSTER_HOME_PATH, "_speakers")
+# SOURCE_SPEAKER_DIRECTORY = os.path.join(CLUSTER_HOME_PATH, "_speakers")
+SOURCE_SPEAKER_DIRECTORY = os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "speaker")
+INFERENCE_SPEAKER_DIRECTORY = os.path.join(OUT_PATH, "speaker")
 COQUI_TTS_PATH = os.path.join(CLUSTER_HOME_PATH, "coqui-tts")
 MODEL_CHECKPOINTS_PATH = os.path.join(CLUSTER_PROJECTS_PATH, "checkpoints")
 
@@ -53,7 +55,7 @@ PHON_DID_CLS_INV = {v: k for k, v in PHON_DID_CLS.items()}
 
 HF_ACCESS_TOKEN = os.getenv("HF_ACCESS_TOKEN")
 
-MODEL_PATH = os.path.join(COQUI_TTS_PATH, "processing", "models")
+MODEL_PATH = os.path.join("processing", "models")
 MODEL_PATH_DID = os.path.join(MODEL_PATH, "text_clf_3_ch_de.joblib")
 
 MODEL_DOWNLOAD_PATH = os.path.join(OUT_PATH, "download")
@@ -80,7 +82,7 @@ def collect_speaker_condition_samples() -> tuple[dict, dict]:
     for dialect in LANG_MAP.keys():
         if dialect == "de":
             continue
-        ref_path = os.path.join(SPEAKER_DIRECTORY, dialect, "references")
+        ref_path = os.path.join(INFERENCE_SPEAKER_DIRECTORY, dialect)
         refs = os.listdir(ref_path)
 
         for speaker in refs:
@@ -249,13 +251,13 @@ def load_transcribed_metadata(model_path: str) -> pd.DataFrame:
                        encoding="utf-8")
 
 
-def run_transcription(model: str):
+def run_transcription(model: str) -> None:
     transcribe_audio_to_german_and_phoneme(model)
     classify_dialect(model)
     calculate_speaker_similarity(model)
 
 
-def _setup_german_transcription_model():
+def _setup_german_transcription_model() -> Pipeline:
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
         MODEL_WHISPER_v3, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
     )
@@ -377,7 +379,6 @@ def _setup_speaker_sim_model():
     model_file = hf_hub_download(repo_id='Jenthe/ECAPA2', filename='ecapa2.pt', cache_dir=MODEL_PATH)
     ecapa2 = torch.jit.load(model_file, map_location=device)
     ecapa2.half()
-    print(type(ecapa2))  # TODO update typing
     return ecapa2
 
 
@@ -407,7 +408,6 @@ def calculate_conditioning_embeddings(unique_speakers: str, ecapa2) -> tuple[dic
 def calculate_speaker_similarity(model_path: str) -> None:
     print(f"Starting Speaker similarity calculation for {model_path}.")
     df = load_transcribed_metadata(model_path)
-    df["speaker_similarity"] = ""
     unique_speakers = df["speaker"].unique()
 
     ecapa2 = _setup_speaker_sim_model()
@@ -416,17 +416,16 @@ def calculate_speaker_similarity(model_path: str) -> None:
     speaker_to_embedding, speaker_to_avg_similarity = calculate_conditioning_embeddings(unique_speakers, ecapa2=ecapa2)
 
     print(f"Calculating speaker embeddings for generated samples for {model_path}.")
-    output_data = []
+    similarities, rel_sims = [], []
+    opath_model = os.path.join(model_path, "generated_speech")
     for sid, speaker in enumerate(unique_speakers):
         mask = df["speaker"] == speaker
         speaker_df = df[mask]
-        orig_dialect = speaker_df["dialect"].iloc[0]
 
-        opath_speaker = os.path.join(model_path, "generated_speech", speaker)
         ref_embeddings_avg = speaker_to_embedding[speaker]
 
         for idx, row in speaker_df.iterrows():
-            audio_file = os.path.join(opath_speaker, row['filepath'])
+            audio_file = os.path.join(opath_model, row["file_path"])
             waveform, _ = torchaudio.load(audio_file)
             sample_embedding = ecapa2(waveform.to(device)).squeeze()
             similarity = float(
@@ -434,35 +433,30 @@ def calculate_speaker_similarity(model_path: str) -> None:
                                                       sample_embedding))
             rel_sim = similarity / speaker_to_avg_similarity[speaker]
 
-            output_data.append({
-                "speaker": speaker,
-                "sent_id": row["tid"],
-                "dialect": row["dialect"],
-                "sentence": row["text"],
-                "audio_file": audio_file,
-                "similarity": float(similarity),
-                "rel_sim": float(rel_sim),
-                "orig_dialect": orig_dialect
-            })
+            similarities.append(float(similarity))
+            rel_sims.append(float(rel_sim))
 
-    output_df = pd.DataFrame(output_data)
-    save_path = os.path.join(model_path, "generated_speech", "speaker_similarity.csv")
-    save_to_csv(output_df, save_path)
-    shutil.copyfile(save_path, os.path.join(save_eval_path, "speaker_similarity.csv"))
+    df["similarity"] = similarities
+    df["rel_sim"] = rel_sims
+
+    save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
+    save_to_csv(df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "transcribed_metadata.csv"))
 
 
 def run_eval(model: str) -> None:
     evaluate_did(model)
     evaluate_de_text(model)
+    evaluate_speaker_similarity(model)
 
 
 def evaluate_did(model_path: str) -> None:
     print(f"Starting DID evaluation for {model_path}.")
     df = load_transcribed_metadata(model_path)
 
-    references = df["dialect"]
+    references = list(df["dialect"])
     reference_classes = [PHON_DID_CLS_INV[ref] for ref in references]
-    hypothesis = df["pred_dialect"]
+    hypothesis = list(df["pred_dialect"])
     hypothesis_classes = [PHON_DID_CLS_INV[hypo] for hypo in hypothesis]
 
     # Create a DataFrame for easy manipulation
@@ -474,22 +468,48 @@ def evaluate_did(model_path: str) -> None:
 
     # Compute F1 scores per dialect
     f1_scores_per_dialect = classification_report(references, hypothesis, output_dict=True)
+
     print("\nF1 scores per dialect:")
+    dialect_region_f1 = []
     for dialect in set(references):
         if dialect in f1_scores_per_dialect:
             print(f"{dialect}: {f1_scores_per_dialect[dialect]['precision']:.4f} & "
                   f"{f1_scores_per_dialect[dialect]['recall']:.4f} & "
-                  f"{f1_scores_per_dialect[dialect]['f1-score']:.4f}"
-                  )
+                  f"{f1_scores_per_dialect[dialect]['f1-score']:.4f}")
+            dialect_region_f1.append({
+                "dialect": dialect,
+                "precision": f1_scores_per_dialect[dialect]['precision'],
+                "recall": f1_scores_per_dialect[dialect]['recall'],
+                "f1-score": f1_scores_per_dialect[dialect]['f1-score']
+            })
+
+    df_did_dialect_region = pd.DataFrame(dialect_region_f1)
+    save_path = os.path.join(model_path, "generated_speech", "did_f1_regions.csv")
+    save_to_csv(df_did_dialect_region, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "did_f1_regions.csv"))
 
     f1_macro = f1_score(reference_classes, hypothesis_classes, average='macro')  # Treat all classes equally
     f1_micro = f1_score(reference_classes, hypothesis_classes, average='micro')  # Aggregate globally
     f1_weighted = f1_score(reference_classes, hypothesis_classes, average='weighted')  # Weight by support
 
-    print(f"Macro F1: {f1_macro}")
-    print(f"Micro F1: {f1_micro}")
-    print(f"Weighted F1: {f1_weighted}")
-    print(f"Match Count: {match_count}")
+    df_did_f1_overall = {
+        "macro_f1": f1_macro,
+        "micro_f1": f1_micro,
+        "weighted_f1": f1_weighted,
+        "match_true": match_count.get(True, 0),
+        "match_false": match_count.get(False, 0)
+    }
+    df_did_overall = pd.DataFrame(df_did_f1_overall)
+    save_path = os.path.join(model_path, "generated_speech", "did_f1_overall.csv")
+    save_to_csv(df_did_overall, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "did_f1_overall.csv"))
+
+    print(
+        f"Macro F1: {f1_macro:.4f}",
+        f"Micro F1: {f1_micro:.4f}",
+        f"Weighted F1: {f1_weighted:.4f}",
+        f"Match Count:\n{match_count.to_string(index=True)}"
+    )
 
     # Confusion Matrix
     conf_matrix = confusion_matrix(references, hypothesis, labels=list(set(references + hypothesis)))
@@ -505,7 +525,7 @@ def evaluate_did(model_path: str) -> None:
     plt.show()
 
 
-def calculate_scores(comparison: pd.DataFrame):
+def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
     scores = {
         "wer": [],
         "wer_lower": [],
@@ -543,14 +563,16 @@ def calculate_scores(comparison: pd.DataFrame):
     reference_split = [ref.split(" ") for ref in comparison["text"]]
     hypothesis_split = [hyp.split(" ") for hyp in comparison["gen_text"]]
     bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
-    comparison["bleu_score"] = bleu_scores
+    scores["bleu_score"] = bleu_scores
 
     reference_split = [ref.lower().split(" ") for ref in comparison["text"]]
     hypothesis_split = [hyp.lower().split(" ") for hyp in comparison["gen_text"]]
     bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
-    comparison["bleu_score_lower"] = bleu_scores
+    scores["bleu_score_lower"] = bleu_scores
 
-    return pd.DataFrame(comparison)
+    # Combine original DataFrame with scores
+    score_df = pd.DataFrame(scores)
+    return pd.concat([comparison.reset_index(drop=True), score_df], axis=1)
 
 
 def evaluate_de_text(model_path: str) -> None:
@@ -564,17 +586,78 @@ def evaluate_de_text(model_path: str) -> None:
     shutil.copyfile(save_path, os.path.join(save_eval_path, "de_text_calc.csv"))
 
 
+def evaluate_speaker_similarity(model_path: str) -> None:
+    print(f"Starting average speaker similarity calculation for {model_path}")
+    df = load_transcribed_metadata(model_path)
+
+    results = []
+    for dialect_1 in LANG_MAP.values():
+        for dialect_2 in LANG_MAP.values():
+            # only use those lines where dial_tag equals d2_tag and orig_dial_tag equals dialect_1
+            dial_df = df[(df["orig_dialect"] == dialect_1) & (df["dialect"] == dialect_2)]
+
+            if len(dial_df) == 0:
+                print(f"No data for {dialect_1, dialect_2}")
+                continue
+
+            similarities = dial_df["similarity"].tolist()
+            avg_similarity = sum(similarities) / len(similarities)
+
+            rel_similarities = dial_df["rel_sim"].tolist()
+            avg_rel_similarity = sum(rel_similarities) / len(rel_similarities)
+
+            results.append({
+                "orig_dialect": dialect_1,
+                "dialect": dialect_2,
+                "avg_similarity": avg_similarity,
+                "avg_rel_similarity": avg_rel_similarity
+            })
+
+    # compute overall metrics
+    similarities = df["similarity"].tolist()
+    rel_similarities = df["rel_sim"].tolist()
+    avg_similarity = sum(similarities) / len(similarities)
+    avg_rel_similarity = sum(rel_similarities) / len(rel_similarities)
+
+    print("Overall:")
+    print(f"avg_similarity: {avg_similarity:.4f}")
+    print(f"avg_rel_similarity: {avg_rel_similarity:.4f}")
+
+    results.append({
+        "orig_dialect": "Overall",
+        "dialect": "Overall",
+        "avg_similarity": avg_similarity,
+        "avg_rel_similarity": avg_rel_similarity
+    })
+
+    sim_df = pd.DataFrame(results)
+    save_path = os.path.join(model_path, "generated_speech", "speaker_similarity.csv")
+    save_to_csv(sim_df, save_path)
+    shutil.copyfile(save_path, os.path.join(save_eval_path, "speaker_similarity.csv"))
+
+
 if __name__ == "__main__":
     device, torch_dtype = setup_gpu_device()
 
-    texts = [f"Das ist ein Beispielsatz, welcher auf Schweizerdeutsch ausgesprochen werden soll"]
+    # Define inference texts
+    texts = list(
+        pd.read_csv(os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "inference_text_samples.csv"),
+                    sep=";", encoding="utf-8")["text"])
+    assert len(texts) == 100, "Loaded less than 100 samples for inference"
+    # texts = [f"Das ist ein Beispielsatz, welcher auf Schweizerdeutsch ausgesprochen werden soll"] * 2
+
+    # Copy speaker conditioning samples and setup lookup structure for inference
+    shutil.copytree(SOURCE_SPEAKER_DIRECTORY, INFERENCE_SPEAKER_DIRECTORY, dirs_exist_ok=True)
     speaker_wavs, speaker_to_dialect = collect_speaker_condition_samples()
+
+    # Get all SwissGPC checkpoints used in evaluation
     list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
                            os.listdir(MODEL_CHECKPOINTS_PATH) if "SwissGPC" in model_dir]
 
     for directory in list_of_directories:
         assert_checkpoint_folder_contains_model(directory)
 
+    # Setup folder structure for specific checkpoint
     dirc = list_of_directories[0]
     folder_name = os.path.basename(os.path.normpath(dirc))
     model_path = os.path.join(OUT_PATH, folder_name)
@@ -598,6 +681,6 @@ if __name__ == "__main__":
     print("Starting evaluation")
     run_eval(model_path)
 
-    # cleanup scratch
+    # Cleanup scratch
     print("Deleting generated speech from scratch folder...")
     shutil.rmtree(model_path)
