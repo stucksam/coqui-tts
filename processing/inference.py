@@ -1,3 +1,4 @@
+import gc
 import os
 import shutil
 import tarfile
@@ -193,6 +194,11 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, 
 
         save_to_csv(df_dialect, os.path.join(out_wav_path, f"metadata_{dial_tag}.csv"))
 
+
+    del tts
+    gc.collect()
+    torch.cuda.empty_cache()
+
     print(f"Finished inference for {dial_tag} for all speakers.")
 
 
@@ -315,9 +321,9 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
             audio_batch.append(audio_data)
 
         # Perform German transcription
-        results_de_text = pipe_german(audio_batch, batch_size=BATCH_SIZE)
+        results_de_text = pipe_german(audio_batch.copy(), batch_size=BATCH_SIZE)
         # Run phoneme transcription
-        results_phoneme = pipe_phoneme(audio_batch, batch_size=BATCH_SIZE)
+        results_phoneme = pipe_phoneme(audio_batch.copy(), batch_size=BATCH_SIZE)
 
         german_text.extend(text["text"].strip() for text in results_de_text)
         phoneme_text.extend(
@@ -336,6 +342,11 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     save_path = os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")
     save_to_csv(df, save_path)
     shutil.copyfile(save_path, os.path.join(save_eval_path, "transcribed_metadata.csv"))
+
+    del pipe_german
+    del pipe_phoneme
+    torch.cuda.empty_cache()
+    gc.collect()
 
 
 def load_phoneme_for_did(df: pd.DataFrame) -> dict:
@@ -493,11 +504,11 @@ def evaluate_did(model_path: str) -> None:
     f1_weighted = f1_score(reference_classes, hypothesis_classes, average='weighted')  # Weight by support
 
     df_did_f1_overall = {
-        "macro_f1": f1_macro,
-        "micro_f1": f1_micro,
-        "weighted_f1": f1_weighted,
-        "match_true": match_count.get(True, 0),
-        "match_false": match_count.get(False, 0)
+        "macro_f1": [f1_macro],
+        "micro_f1": [f1_micro],
+        "weighted_f1": [f1_weighted],
+        "match_true": [match_count.get(True, 0)],
+        "match_false": [match_count.get(False, 0)]
     }
     df_did_overall = pd.DataFrame(df_did_f1_overall)
     save_path = os.path.join(model_path, "generated_speech", "did_f1_overall.csv")
@@ -651,36 +662,52 @@ if __name__ == "__main__":
     speaker_wavs, speaker_to_dialect = collect_speaker_condition_samples()
 
     # Get all SwissGPC checkpoints used in evaluation
+    swissgpc_filer = "SwissGPC_epoch_3_subset_4"
+
     list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
-                           os.listdir(MODEL_CHECKPOINTS_PATH) if "SwissGPC" in model_dir]
+                           os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filer in model_dir]
 
     for directory in list_of_directories:
         assert_checkpoint_folder_contains_model(directory)
 
-    # Setup folder structure for specific checkpoint
-    dirc = list_of_directories[0]
-    folder_name = os.path.basename(os.path.normpath(dirc))
-    model_path = os.path.join(OUT_PATH, folder_name)
-    os.makedirs(model_path, exist_ok=True)
+        folder_name = os.path.basename(os.path.normpath(directory))
+        save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
+        os.makedirs(save_eval_path, exist_ok=True)
 
-    save_eval_path = os.path.join(CLUSTER_PROJECTS_PATH, "generated_speech", folder_name)
-    os.makedirs(save_eval_path, exist_ok=True)
+        if "speaker_similarity.csv" in os.listdir(save_eval_path):
+            print(f"Evaluation already done, skipping {folder_name}...")
+            continue
 
-    try:
-        set_start_method("spawn")  # Important due to cuda not being able to fork processes
-    except RuntimeError:
-        print("Experienced issue on setting start method from fork to spawn...")
-        pass  # Start method already set (usually when re-running in interactive environments)
+        # Setup folder structure for specific checkpoint
+        model_path = os.path.join(OUT_PATH, folder_name)
+        os.makedirs(model_path, exist_ok=True)
 
-    print("Starting inference")
-    run_inference(model_path)
 
-    print("Starting transcription")
-    run_transcription(model_path)
+        try:
+            set_start_method("spawn")  # Important due to cuda not being able to fork processes
+        except RuntimeError:
+            print("Experienced issue on setting start method from fork to spawn...")
+            pass  # Start method already set (usually when re-running in interactive environments)
 
-    print("Starting evaluation")
-    run_eval(model_path)
+        print("Starting inference")
+        run_inference(model_path)
 
-    # Cleanup scratch
-    print("Deleting generated speech from scratch folder...")
-    shutil.rmtree(model_path)
+        # shutil.copyfile(os.path.join(save_eval_path, "generated_speech.tar.gz"), os.path.join(model_path, "generated_speech.tar.gz"))
+        #
+        # # Extract the tar.gz file
+        # with tarfile.open(os.path.join(model_path, "generated_speech.tar.gz"), "r:gz") as tar:
+        #     tar.extractall(path=model_path)
+        #
+        # shutil.copyfile(os.path.join(save_eval_path, "metadata.csv"), os.path.join(model_path, "generated_speech", "metadata.csv"))
+
+        print("Starting transcription")
+        run_transcription(model_path)
+
+        # shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"), os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
+
+        print("Starting evaluation")
+        run_eval(model_path)
+
+        # Cleanup scratch
+        print("Deleting generated speech from scratch folder...")
+        shutil.rmtree(model_path)
