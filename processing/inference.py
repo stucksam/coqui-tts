@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torchaudio
+import whisperx
 from bert_score import score as bert_score
 from huggingface_hub import hf_hub_download
 from joblib import load
@@ -194,7 +195,6 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, 
 
         save_to_csv(df_dialect, os.path.join(out_wav_path, f"metadata_{dial_tag}.csv"))
 
-
     del tts
     gc.collect()
     torch.cuda.empty_cache()
@@ -247,6 +247,10 @@ def run_inference(model_path: str) -> None:
     shutil.copyfile(generated_speech_zip, os.path.join(save_eval_path, "generated_speech.tar.gz"))
     shutil.copyfile(meta_data_path, os.path.join(save_eval_path, "metadata.csv"))
 
+    del processes
+    torch.cuda.empty_cache()
+    gc.collect()
+
 
 def load_wav_metadata(model_path: str) -> pd.DataFrame:
     return pd.read_csv(os.path.join(model_path, "generated_speech", "metadata.csv"), sep=";", encoding="utf-8")
@@ -265,7 +269,7 @@ def run_transcription(model: str) -> None:
 
 def _setup_german_transcription_model() -> Pipeline:
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
-        MODEL_WHISPER_v3, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
+        MODEL_WHISPER_v3, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True, cache_dir=MODEL_PATH
     )
     model.to(device)
 
@@ -277,6 +281,7 @@ def _setup_german_transcription_model() -> Pipeline:
         tokenizer=processor.tokenizer,
         feature_extractor=processor.feature_extractor,
         torch_dtype=torch_dtype,
+        chunk_length_s=30.0,
         device=device,
         generate_kwargs={"language": "german", "no_repeat_ngram_size": 2}
     )
@@ -296,12 +301,24 @@ def _setup_phoneme_model() -> Pipeline:
     )
 
 
+def _setup_whisperx_model():
+    # 1. Transcribe with original whisper (batched)
+    model = whisperx.load_model("large-v3", device, language="de", compute_type="float16",
+                                download_root=MODEL_PATH)
+    return model
+
+
 def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     print(f"Transcribing generated samples by {model_path} into German and Phoneme.")
     df = load_wav_metadata(model_path)
     num_samples = len(df)
 
+    if "gen_text" in df.columns or "phoneme" in df.columns:
+        print("Already transcribed samples, skipping step...")
+        return
+
     pipe_german = _setup_german_transcription_model()
+    # model_whisperx = _setup_whisperx_model()
     pipe_phoneme = _setup_phoneme_model()
 
     german_text, phoneme_text, length_audio = [], [], []
@@ -322,10 +339,14 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
 
         # Perform German transcription
         results_de_text = pipe_german(audio_batch.copy(), batch_size=BATCH_SIZE)
+        german_text.extend(text["text"].strip() for text in results_de_text)
+
+        # Run batch transcription
+        # results_de_text = [model_whisperx.transcribe(audio, chunk_size=15, language="de") for audio in audio_batch.copy()]
+        # german_text = [res["segments"][0]["text"].strip() for res in results_de_text]
+
         # Run phoneme transcription
         results_phoneme = pipe_phoneme(audio_batch.copy(), batch_size=BATCH_SIZE)
-
-        german_text.extend(text["text"].strip() for text in results_de_text)
         phoneme_text.extend(
             phoneme["text"].strip() if phoneme["text"].strip() else MISSING_PHONEME
             for phoneme in results_phoneme
@@ -344,6 +365,7 @@ def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     shutil.copyfile(save_path, os.path.join(save_eval_path, "transcribed_metadata.csv"))
 
     del pipe_german
+    # del model_whisperx
     del pipe_phoneme
     torch.cuda.empty_cache()
     gc.collect()
@@ -361,7 +383,12 @@ def load_phoneme_for_did(df: pd.DataFrame) -> dict:
 def classify_dialect(model_path: str) -> None:
     print(f"Classifying dialect for generated samples by {model_path}.")
     df = load_transcribed_metadata(model_path)
+    if "pred_dialect" in df.columns:
+        print("Already classified dialect, skipping dialect classification...")
+        return
+
     df["pred_dialect"] = ""
+
     phoneme_per_speaker = load_phoneme_for_did(df)
 
     text_clf = load(MODEL_PATH_DID)
@@ -419,6 +446,11 @@ def calculate_conditioning_embeddings(unique_speakers: str, ecapa2) -> tuple[dic
 def calculate_speaker_similarity(model_path: str) -> None:
     print(f"Starting Speaker similarity calculation for {model_path}.")
     df = load_transcribed_metadata(model_path)
+
+    if "similarity" in df.columns or "rel_sim" in df.columns:
+        print("Already calculated speaker sim, skipping step...")
+        return
+
     unique_speakers = df["speaker"].unique()
 
     ecapa2 = _setup_speaker_sim_model()
@@ -566,9 +598,15 @@ def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
         scores["cer"].append(jiwer.process_characters(ref, hypo).cer)
         scores["cer_lower"].append(jiwer.process_characters(ref_low, hypo_low).cer)
 
-        # BERTScore (computed per sentence)
-        _, _, F1 = bert_score([hypo], [ref], lang="de")
-        scores["bert_score"].append(F1.mean().item())
+    P, R, F1 = bert_score(
+        comparison["gen_text"].tolist(),
+        comparison["text"].tolist(),
+        lang="de",
+        batch_size=64,
+        verbose=False,
+        device=device
+    )
+    scores["bert_score"] = F1.cpu().numpy().tolist()
 
     # Calculate BLEU Score
     reference_split = [ref.split(" ") for ref in comparison["text"]]
@@ -587,6 +625,10 @@ def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
 
 
 def evaluate_de_text(model_path: str) -> None:
+    if "de_text_calc.csv" in os.listdir(save_eval_path):
+        print(f"De text eval already done, skipping {model_path}...")
+        return
+
     print(f"Starting score calculation for DE-text for {model_path}.")
     df = load_transcribed_metadata(model_path)
     de_text_df = df[["speaker", "orig_dialect", "dialect", "tid", "text", "gen_text"]].copy()
@@ -652,9 +694,9 @@ if __name__ == "__main__":
 
     # Define inference texts
     texts = list(
-        pd.read_csv(os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "inference_text_samples.csv"),
+        pd.read_csv(os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "50_inference_text_samples.csv"),
                     sep=";", encoding="utf-8")["text"])
-    assert len(texts) == 100, "Loaded less than 100 samples for inference"
+    assert len(texts) == 50, f"Loaded less than 50 samples for inference: {len(texts)}"
     # texts = [f"Das ist ein Beispielsatz, welcher auf Schweizerdeutsch ausgesprochen werden soll"] * 2
 
     # Copy speaker conditioning samples and setup lookup structure for inference
@@ -662,10 +704,11 @@ if __name__ == "__main__":
     speaker_wavs, speaker_to_dialect = collect_speaker_condition_samples()
 
     # Get all SwissGPC checkpoints used in evaluation
-    swissgpc_filer = "SwissGPC_epoch_3_subset_4"
+    swissgpc_filter = "SwissGPC_epoch_5"
+    # swissgpc_filter = "SwissGPC_epoch_1_subset_0"
 
     list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
-                           os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filer in model_dir]
+                           os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filter in model_dir]
 
     for directory in list_of_directories:
         assert_checkpoint_folder_contains_model(directory)
@@ -682,12 +725,15 @@ if __name__ == "__main__":
         model_path = os.path.join(OUT_PATH, folder_name)
         os.makedirs(model_path, exist_ok=True)
 
-
         try:
             set_start_method("spawn")  # Important due to cuda not being able to fork processes
         except RuntimeError:
             print("Experienced issue on setting start method from fork to spawn...")
             pass  # Start method already set (usually when re-running in interactive environments)
+
+        if "generated_speech.tar.gz" in os.listdir(save_eval_path):
+            print(f"Inference already done, skipping {folder_name}...")
+            continue
 
         print("Starting inference")
         run_inference(model_path)
