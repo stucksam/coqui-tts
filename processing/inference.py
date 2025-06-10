@@ -75,6 +75,7 @@ BATCH_SIZE = 32
 def setup_gpu_device() -> tuple:
     train_device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    print(f"Running on device {train_device} with dtype {dtype}")
     return train_device, dtype
 
 
@@ -693,9 +694,8 @@ if __name__ == "__main__":
     device, torch_dtype = setup_gpu_device()
 
     # Define inference texts
-    texts = list(
-        pd.read_csv(os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "50_inference_text_samples.csv"),
-                    sep=";", encoding="utf-8")["text"])
+    text_file = os.path.join(CLUSTER_PROJECTS_PATH, "snf_eval_condition_files", "50_inference_text_samples.csv")
+    texts = list(pd.read_csv(text_file, sep=";", encoding="utf-8")["text"])
     assert len(texts) == 50, f"Loaded less than 50 samples for inference: {len(texts)}"
     # texts = [f"Das ist ein Beispielsatz, welcher auf Schweizerdeutsch ausgesprochen werden soll"] * 2
 
@@ -709,6 +709,12 @@ if __name__ == "__main__":
 
     list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
                            os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filter in model_dir]
+
+    try:
+        set_start_method("spawn")  # Important due to cuda not being able to fork processes
+    except RuntimeError:
+        print("Experienced issue on setting start method from fork to spawn...")
+        pass  # Start method already set (usually when re-running in interactive environments)
 
     for directory in list_of_directories:
         assert_checkpoint_folder_contains_model(directory)
@@ -724,12 +730,6 @@ if __name__ == "__main__":
         # Setup folder structure for specific checkpoint
         model_path = os.path.join(OUT_PATH, folder_name)
         os.makedirs(model_path, exist_ok=True)
-
-        try:
-            set_start_method("spawn")  # Important due to cuda not being able to fork processes
-        except RuntimeError:
-            print("Experienced issue on setting start method from fork to spawn...")
-            pass  # Start method already set (usually when re-running in interactive environments)
 
         if "generated_speech.tar.gz" in os.listdir(save_eval_path):
             print(f"Inference already done, skipping {folder_name}...")
