@@ -38,32 +38,42 @@ def extract_epoch_and_subset(folder: str) -> tuple[int, int]:
     return epoch, subset
 
 
+def save_to_csv(entries: list | pd.DataFrame, path: str) -> None:
+    if isinstance(entries, list):
+        entries = pd.DataFrame(entries)
+
+    entries.to_csv(path, index=False, encoding="utf-8", sep=";")
+
+
+
 if __name__ == "__main__":
     # Get all SwissGPC checkpoints used in evaluation
     swissgpc_filter = "SwissGPC"
 
     list_of_directories = [os.path.join(MODEL_EVAL_PATH, model_dir) for model_dir in
                            os.listdir(MODEL_EVAL_PATH) if swissgpc_filter in model_dir]
-    # list_of_directories = ["GPT_XTTS_v2.0_SwissGPC_epoch_2_subset_3", "GPT_XTTS_v2.0_SwissGPC_epoch_6_subset_6",
-    #                        "GPT_XTTS_v2.0_SwissGPC_epoch_5_subset_0"]
 
     df = []
+    df_regional_f1_scores = []
     for directory in list_of_directories:
         folder_name = os.path.basename(os.path.normpath(directory))
         epoch, subset = extract_epoch_and_subset(folder_name)
 
-        if not os.path.exists(os.path.join(directory, "speaker_similarity.csv")):
-            print(f"{folder_name} has not been evaluated yet, continuing...")
+        # if not os.path.exists(os.path.join(directory, "speaker_similarity.csv")):
+        #     print(f"{folder_name} has not been evaluated yet, continuing...")
+        #     continue
+        try:
+            df_text = load_csv(os.path.join(directory, "de_text_calc.csv"))
+            df_did_regions = load_csv(os.path.join(directory, "did_f1_regions.csv"))
+
+            df_did_overall = load_csv(os.path.join(directory, "did_f1_overall.csv"))
+            f1_overall = df_did_overall.iloc[-1]
+
+            # df_sim = load_csv(os.path.join(directory, "speaker_similarity.csv"))
+            # sim_overall = df_sim.iloc[-1]
+        except Exception as e:
+            print(f"Could not execute model eval for {directory} due to: {str(e)}")
             continue
-
-        df_text = load_csv(os.path.join(directory, "de_text_calc.csv"))
-        df_did_regions = load_csv(os.path.join(directory, "did_f1_regions.csv"))
-
-        df_did_overall = load_csv(os.path.join(directory, "did_f1_overall.csv"))
-        f1_overall = df_did_overall.iloc[-1]
-
-        df_sim = load_csv(os.path.join(directory, "speaker_similarity.csv"))
-        sim_overall = df_sim.iloc[-1]
 
         entry = {"checkpoint": folder_name,
                  "epoch": epoch,
@@ -84,12 +94,31 @@ if __name__ == "__main__":
                  "bleu_low_med": df_text["bleu_score_lower"].median(),
                  "macro_f1": f1_overall["macro_f1"],
                  "micro_f1": f1_overall["micro_f1"],
-                 "weighted_f1": f1_overall["weighted_f1"],
-                 "speaker_sim_avg": sim_overall["avg_similarity"],
-                 "speaker_sim_avg_rel": sim_overall["avg_rel_similarity"]
+                 "weighted_f1": f1_overall["weighted_f1"]
+                 # "speaker_sim_avg": sim_overall["avg_similarity"],
+                 # "speaker_sim_avg_rel": sim_overall["avg_rel_similarity"]
                  }
         df.append(entry)
+
+        f1_entry = {
+            "checkpoint": folder_name,
+            "epoch": epoch,
+            "subset": subset,
+            "overall_macro_f1": f1_overall["macro_f1"],
+            "overall_micro_f1": f1_overall["micro_f1"],
+            "overall_weighted_f1": f1_overall["weighted_f1"]
+        }
+        for idx, row in df_did_regions.iterrows():
+            f1_entry[f"f1_{row['dialect']}"] = row["f1-score"]
+            f1_entry[f"recall_{row['dialect']}"] = row["precision"]
+            f1_entry[f"precision_{row['dialect']}"] = row["recall"]
+
+        df_regional_f1_scores.append(f1_entry)
+
+
     df = pd.DataFrame(df)
     save_path = os.path.join(MODEL_EVAL_PATH, "SwissGPC_eval_results.csv")
-    df.to_csv(save_path, index=False, encoding="utf-8", sep=";")
+    save_path_f1 = os.path.join(MODEL_EVAL_PATH, "SwissGPC_eval_f1_results.csv")
+    save_to_csv(df, save_path)
+    save_to_csv(df_regional_f1_scores, save_path_f1)
     print(f"Evaluation result of SwissGPC trained XTTS model has been saved at: {save_path}")
