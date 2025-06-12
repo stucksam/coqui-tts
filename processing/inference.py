@@ -204,6 +204,10 @@ def run_inference_for_dialect(model_path: str, config_path: str, dial_tag: str, 
 
 
 def run_inference(model_path: str) -> None:
+    if "generated_speech.tar.gz" in os.listdir(save_eval_path):
+        print(f"Inference already done, skipping {folder_name}...")
+        return
+
     config_path = os.path.join(model_path, "config.json")
     vocab_path = os.path.join(model_path, "vocab.json")
 
@@ -311,12 +315,16 @@ def _setup_whisperx_model():
 
 def transcribe_audio_to_german_and_phoneme(model_path: str) -> None:
     print(f"Transcribing generated samples by {model_path} into German and Phoneme.")
+
+    if os.path.exists(os.path.join(model_path, "generated_speech", "transcribed_metadata.csv")):
+        df_transcribed = load_transcribed_metadata(model_path)
+
+        if "gen_text" in df_transcribed.columns or "phoneme" in df_transcribed.columns:
+            print("Already transcribed samples, skipping step...")
+            return
+
     df = load_wav_metadata(model_path)
     num_samples = len(df)
-
-    if "gen_text" in df.columns or "phoneme" in df.columns:
-        print("Already transcribed samples, skipping step...")
-        return
 
     pipe_german = _setup_german_transcription_model()
     # model_whisperx = _setup_whisperx_model()
@@ -383,6 +391,7 @@ def load_phoneme_for_did(df: pd.DataFrame) -> dict:
 
 def classify_dialect(model_path: str) -> None:
     print(f"Classifying dialect for generated samples by {model_path}.")
+
     df = load_transcribed_metadata(model_path)
     if "pred_dialect" in df.columns:
         print("Already classified dialect, skipping dialect classification...")
@@ -582,6 +591,7 @@ def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
         "bert_score": [],
     }
 
+    print("Starting WER, MER, etc. calculations...")
     for idx, row in comparison.iterrows():
         ref, hypo = row["text"], row["gen_text"]
         ref_low, hypo_low = ref.lower(), hypo.lower()
@@ -599,6 +609,7 @@ def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
         scores["cer"].append(jiwer.process_characters(ref, hypo).cer)
         scores["cer_lower"].append(jiwer.process_characters(ref_low, hypo_low).cer)
 
+    print("Starting BERTScore calculations...")
     P, R, F1 = bert_score(
         comparison["gen_text"].tolist(),
         comparison["text"].tolist(),
@@ -610,6 +621,7 @@ def calculate_scores(comparison: pd.DataFrame) -> pd.DataFrame:
     scores["bert_score"] = F1.cpu().numpy().tolist()
 
     # Calculate BLEU Score
+    print("Starting BLEU calculations...")
     reference_split = [ref.split(" ") for ref in comparison["text"]]
     hypothesis_split = [hyp.split(" ") for hyp in comparison["gen_text"]]
     bleu_scores = [sentence_bleu([ref], hyp) for ref, hyp in zip(reference_split, hypothesis_split)]
@@ -731,20 +743,21 @@ if __name__ == "__main__":
         model_path = os.path.join(OUT_PATH, folder_name)
         os.makedirs(model_path, exist_ok=True)
 
-        if "generated_speech.tar.gz" in os.listdir(save_eval_path):
-            print(f"Inference already done, skipping {folder_name}...")
-            continue
-
         print("Starting inference")
         run_inference(model_path)
 
         # shutil.copyfile(os.path.join(save_eval_path, "generated_speech.tar.gz"), os.path.join(model_path, "generated_speech.tar.gz"))
-        #
+
         # # Extract the tar.gz file
         # with tarfile.open(os.path.join(model_path, "generated_speech.tar.gz"), "r:gz") as tar:
         #     tar.extractall(path=model_path)
         #
-        # shutil.copyfile(os.path.join(save_eval_path, "metadata.csv"), os.path.join(model_path, "generated_speech", "metadata.csv"))
+        # shutil.copyfile(os.path.join(save_eval_path, "metadata.csv"),
+        #                 os.path.join(model_path, "generated_speech", "metadata.csv"))
+
+
+        # if os.path.exists(os.path.join(save_eval_path, "transcribed_metadata.csv")):
+        #     shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"), os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
 
         print("Starting transcription")
         run_transcription(model_path)

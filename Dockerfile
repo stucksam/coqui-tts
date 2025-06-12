@@ -5,9 +5,8 @@ FROM ${BASE}
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc g++ make \
-    python3 python3-dev python3-pip python3-venv python3-wheel \
-    espeak-ng libsndfile1-dev festival ffmpeg git hdf5-tools mbrola \
-    && apt-get clean && \
+    python3 python3-dev python3-pip python3-venv python3-wheel espeak-ng libsndfile1-dev festival ffmpeg git hdf5-tools mbrola && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip first
