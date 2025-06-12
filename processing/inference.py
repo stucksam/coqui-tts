@@ -702,7 +702,17 @@ def evaluate_speaker_similarity(model_path: str) -> None:
     shutil.copyfile(save_path, os.path.join(save_eval_path, "speaker_similarity.csv"))
 
 
+def str_to_bool(v: str) -> bool:
+    return v.lower() in ("yes", "true", "t", "1")
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run script with optional steps.")
+    parser.add_argument("--inference", type=str_to_bool, default=True, help="Run inference step (default: True)")
+    parser.add_argument("--transcription", type=str_to_bool, default=True, help="Run transcription step (default: True)")
+    parser.add_argument("--evaluation", type=str_to_bool, default=True, help="Run evaluation step (default: True)")
+    args = parser.parse_args()
+    print(f"Running script with params inference={args.inference}, transcription={args.transcription}, evaluation={args.evaluation}")
     device, torch_dtype = setup_gpu_device()
 
     # Define inference texts
@@ -716,11 +726,18 @@ if __name__ == "__main__":
     speaker_wavs, speaker_to_dialect = collect_speaker_condition_samples()
 
     # Get all SwissGPC checkpoints used in evaluation
-    swissgpc_filter = "SwissGPC_epoch_5"
+    swissgpc_filter = ""
+    # swissgpc_filter = "SwissGPC_epoch_3"
     # swissgpc_filter = "SwissGPC_epoch_1_subset_0"
+    if swissgpc_filter:
+        list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
+                               os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filter in model_dir]
+    else:
+        list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
+                               os.listdir(MODEL_CHECKPOINTS_PATH)]
 
-    list_of_directories = [os.path.join(MODEL_CHECKPOINTS_PATH, model_dir) for model_dir in
-                           os.listdir(MODEL_CHECKPOINTS_PATH) if swissgpc_filter in model_dir]
+    print("Order of execution is as follows:")
+    print(list_of_directories)
 
     try:
         set_start_method("spawn")  # Important due to cuda not being able to fork processes
@@ -743,30 +760,36 @@ if __name__ == "__main__":
         model_path = os.path.join(OUT_PATH, folder_name)
         os.makedirs(model_path, exist_ok=True)
 
-        print("Starting inference")
-        run_inference(model_path)
+        if args.inference:
+            print("Starting inference")
+            run_inference(model_path)
 
-        # shutil.copyfile(os.path.join(save_eval_path, "generated_speech.tar.gz"), os.path.join(model_path, "generated_speech.tar.gz"))
+        if args.transcription:
+            if not args.inference:  # case that inference was not performed, so audio needs to be copied
+                shutil.copyfile(os.path.join(save_eval_path, "generated_speech.tar.gz"),
+                                os.path.join(model_path, "generated_speech.tar.gz"))
 
-        # # Extract the tar.gz file
-        # with tarfile.open(os.path.join(model_path, "generated_speech.tar.gz"), "r:gz") as tar:
-        #     tar.extractall(path=model_path)
-        #
-        # shutil.copyfile(os.path.join(save_eval_path, "metadata.csv"),
-        #                 os.path.join(model_path, "generated_speech", "metadata.csv"))
+                # Extract the tar.gz file
+                with tarfile.open(os.path.join(model_path, "generated_speech.tar.gz"), "r:gz") as tar:
+                    tar.extractall(path=model_path)
 
+                shutil.copyfile(os.path.join(save_eval_path, "metadata.csv"),
+                                os.path.join(model_path, "generated_speech", "metadata.csv"))
 
-        # if os.path.exists(os.path.join(save_eval_path, "transcribed_metadata.csv")):
-        #     shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"), os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
+                if os.path.exists(os.path.join(save_eval_path, "transcribed_metadata.csv")):
+                    shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"), os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
 
-        print("Starting transcription")
-        run_transcription(model_path)
+            print("Starting transcription")
+            run_transcription(model_path)
 
-        # shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"), os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
+        if args.evaluation:
+            if not args.transcription:  # case that transcription is not performed, so transcribed metadata neesd to be copied
+                shutil.copyfile(os.path.join(save_eval_path, "transcribed_metadata.csv"),
+                                os.path.join(model_path, "generated_speech", "transcribed_metadata.csv"))
 
-        print("Starting evaluation")
-        run_eval(model_path)
+            print("Starting evaluation")
+            run_eval(model_path)
 
         # Cleanup scratch
-        print("Deleting generated speech from scratch folder...")
+        print("Deleting model { folders from scratch...")
         shutil.rmtree(model_path)
